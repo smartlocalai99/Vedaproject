@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, User, Lock } from "lucide-react";
 import { useRouter } from "next/router";
+import { supabase } from "@/lib/supabase";
 
 export default function SalesLogin() {
   const router = useRouter();
@@ -10,6 +11,8 @@ export default function SalesLogin() {
     employeeId: "",
     password: "",
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setForm({
@@ -18,14 +21,31 @@ export default function SalesLogin() {
     });
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
   e.preventDefault();
 
   if (!form.employeeId || !form.password) {
-    alert("Please enter Employee ID and Password");
+    setError("Please enter Employee ID and Password");
     return;
   }
-
+  setLoading(true);
+  setError("");
+  const { data, error: loginError } = await supabase
+    .from("sales_executives")
+    .select("id, employee_id, full_name, email, mobile_number, assigned_area, status, created_at")
+    .eq("employee_id", form.employeeId)
+    .eq("password", form.password)
+    .maybeSingle();
+  setLoading(false);
+  if (loginError) {
+    setError(loginError.message);
+    return;
+  }
+  if (!data || data.status !== "Active") {
+    setError("Invalid credentials or inactive account.");
+    return;
+  }
+  localStorage.setItem("salesExecutiveSession", JSON.stringify(data));
   router.push("/salesexecutive/dashboard");
 };
 
@@ -127,12 +147,15 @@ export default function SalesLogin() {
 
           <button
             type="submit"
+            disabled={loading}
             className="w-full bg-[#13273c] hover:bg-[#1d3650] text-white py-3 rounded-xl font-semibold transition"
           >
-            Login
+            {loading ? "Logging in..." : "Login"}
           </button>
 
         </form>
+
+        {error && <p className="mt-3 text-center text-sm text-red-500">{error}</p>}
 
         <div className="mt-6 text-center">
 

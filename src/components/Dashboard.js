@@ -9,11 +9,34 @@ import {
 
 import Image from "next/image";
 import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 
 export default function Dashboard() {
 
   const router = useRouter();
+  const [stats, setStats] = useState({ sales: 0, vendors: 0, members: 0, transactions: 0, benefits: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadDashboard() {
+      setLoading(true);
+      const [sales, vendors, members, transactions, benefits] = await Promise.all([
+        supabase.from("sales_executives").select("id", { count: "exact", head: true }),
+        supabase.from("vendors").select("id", { count: "exact", head: true }),
+        supabase.from("members").select("id", { count: "exact", head: true }),
+        supabase.from("transactions").select("id", { count: "exact", head: true }),
+        supabase.from("transactions").select("benefit_amount"),
+      ]);
+      const queryError = sales.error || vendors.error || members.error || transactions.error || benefits.error;
+      if (queryError) setError(queryError.message);
+      else setStats({ sales: sales.count || 0, vendors: vendors.count || 0, members: members.count || 0, transactions: transactions.count || 0, benefits: (benefits.data || []).reduce((total, item) => total + Number(item.benefit_amount || 0), 0) });
+      setLoading(false);
+    }
+    loadDashboard();
+  }, []);
 
 
   return (
@@ -103,34 +126,35 @@ gap-2
   <Stat
     icon={<UserRound size={18}/>}
     title="Total Sales Executives"
-    value="12"
+    value={loading ? "..." : stats.sales}
   />
 
 
   <Stat
     icon={<Store size={18}/>}
     title="Total Vendors"
-    value="145"
+    value={loading ? "..." : stats.vendors}
   />
 
 
   <Stat
     icon={<Users size={18}/>}
     title="Total Members"
-    value="1,286"
+    value={loading ? "..." : stats.members}
   />
 
 
   <Stat
     icon={<FileText size={18}/>}
     title="Total Transactions"
-    value="3,562"
+    value={loading ? "..." : stats.transactions}
   />
 
 
   <Stat
     icon={<IndianRupee size={18}/>}
-    title="Total Turnover"
+    benefitValue={loading ? "..." : `₹${stats.benefits.toLocaleString("en-IN")}`}
+    title="Total Benefits Given"
     value="₹45,680"
   />
 
@@ -323,7 +347,7 @@ gap-2
 
 
 
-function Stat({icon,title,value}){
+function Stat({icon,title,value,benefitValue}){
 
 
 return(
@@ -385,7 +409,7 @@ text-[#1B2232]
 font-bold
 text-sm
 ">
-{value}
+{benefitValue || value}
 </p>
 
 

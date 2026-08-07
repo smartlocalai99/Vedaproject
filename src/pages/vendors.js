@@ -1,4 +1,5 @@
-import { 
+/* eslint-disable react-hooks/set-state-in-effect */
+import {
   Store,
   Search,
   Plus,
@@ -9,39 +10,10 @@ import {
   UserRound,
 } from "lucide-react";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import SuperAdminFooter from "@/components/SuperAdminFooter";
-
-
-const initialVendors=[
-
-{
-name:"Apollo Medical Store",
-category:"Pharmacy",
-location:"Kadapa",
-phone:"9876543210",
-status:"Active"
-},
-
-{
-name:"Sri Lakshmi Restaurant",
-category:"Restaurant",
-location:"Kadapa",
-phone:"9988776655",
-status:"Active"
-},
-
-{
-name:"Fashion Hub",
-category:"Clothing",
-location:"Kadapa",
-phone:"9123456789",
-status:"Inactive"
-}
-
-];
-
+import { supabase } from "@/lib/supabase";
 
 
 export default function Vendors(){
@@ -50,17 +22,43 @@ export default function Vendors(){
 const router = useRouter();
 
 
-const [vendors,setVendors]=useState(initialVendors);
+const [vendors,setVendors] = useState([]);
 
-const [create,setCreate]=useState(false);
+const [create,setCreate] = useState(false);
+const [editing, setEditing] = useState(null);
+const [search, setSearch] = useState("");
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
+
+const loadVendors = async () => {
+  setLoading(true);
+  const { data, error: loadError } = await supabase.from("vendors").select("*").order("created_at", { ascending: false });
+  if (loadError) setError(loadError.message);
+  else setVendors(data || []);
+  setLoading(false);
+};
+
+useEffect(() => { loadVendors(); }, []);
+
+const deleteVendor = async (id) => {
+  if (!window.confirm("Delete this vendor?")) return;
+  const { error: deleteError } = await supabase.from("vendors").delete().eq("id", id);
+  if (deleteError) setError(deleteError.message);
+  else loadVendors();
+};
+
+const filteredVendors = vendors.filter((vendor) => [vendor.business_name, vendor.category, vendor.address, vendor.mobile_number].filter(Boolean).join(" ").toLowerCase().includes(search.toLowerCase()));
 
 
 
-return(
+return (
+
+<>
 
 <main className="
 bg-[#F8F4EE]
 min-h-screen
+pb-24
 p-5
 text-[#1B2232]
 ">
@@ -106,13 +104,23 @@ hover:bg-gray-200
 
 <div>
 
-<h1 className="font-bold text-sm">
+<h1 className="
+font-bold
+text-sm
+">
+
 Vendors
+
 </h1>
 
 
-<p className="text-[10px] text-gray-500">
+<p className="
+text-[10px]
+text-gray-500
+">
+
 Manage all vendors
+
 </p>
 
 
@@ -126,7 +134,8 @@ Manage all vendors
 
 <button
 
-onClick={()=>setCreate(true)}
+onClick={()=>{ setEditing(null); setCreate(true); setTimeout(() => document.getElementById("create-vendor-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); }}
+type="button"
 
 className="
 bg-[#172033]
@@ -149,10 +158,7 @@ Add Vendor
 </button>
 
 
-
 </div>
-
-
 
 
 
@@ -160,10 +166,11 @@ Add Vendor
 
 {/* SEARCH */}
 
+
 <div className="
 bg-white
 rounded-lg
-mt-5
+mt-2
 h-10
 flex
 items-center
@@ -172,7 +179,7 @@ gap-2
 ">
 
 
-<Search
+<Search 
 size={16}
 className="text-gray-400"
 />
@@ -181,6 +188,8 @@ className="text-gray-400"
 <input
 
 placeholder="Search vendors"
+value={search}
+onChange={(e) => setSearch(e.target.value)}
 
 className="
 outline-none
@@ -197,24 +206,22 @@ w-full
 
 
 
-
-
-{/* VENDOR LIST */}
+{/* LIST */}
 
 
 <div className="
-mt-4
+mt-1
 space-y-3
 ">
 
 
 {
-vendors.map((vendor,index)=>(
+filteredVendors.map((vendor,index)=>(
 
 
 <div
 
-key={index}
+key={vendor.id}
 
 className="
 bg-white
@@ -222,6 +229,7 @@ rounded-lg
 p-3
 shadow-sm
 "
+
 
 >
 
@@ -262,13 +270,12 @@ text-[#B97943]
 
 <div>
 
-
 <h3 className="
 text-xs
 font-bold
 ">
 
-{vendor.name}
+{vendor.business_name}
 
 </h3>
 
@@ -283,18 +290,20 @@ text-gray-500
 </p>
 
 
-
 <p className="
 text-[10px]
 text-gray-400
 ">
 
-{vendor.location}
+{vendor.address}
 
 </p>
 
 
-</div>
+  </div>
+
+{loading && <p className="text-xs text-gray-500">Loading vendors...</p>}
+{error && <p className="text-xs text-red-600">{error}</p>}
 
 
 </div>
@@ -303,53 +312,40 @@ text-gray-400
 
 
 
-
-<span className="
-text-[10px]
-flex
-items-center
-gap-1
-">
+<div className="text-[10px] flex items-center gap-1">
 
 
 <span className={`
 w-2
 h-2
 rounded-full
-${
-vendor.status==="Active"
-?
-"bg-green-500"
-:
-"bg-red-500"
-}
-`}/>
+${vendor.status==="Active"
+?"bg-green-500"
+:"bg-red-500"}
+`}></span>
 
 
-<span className={
-
-vendor.status==="Active"
-?
-"text-green-700"
-:
-"text-red-600"
-
-}>
+<span className={`
+${vendor.status==="Active"
+?"text-green-700"
+:"text-red-600"}
+`}>
 
 {vendor.status}
 
 </span>
 
+<button onClick={() => { setEditing(vendor); setCreate(true); }} className="border rounded px-2 py-1 text-[10px]">Edit</button>
+<button onClick={() => deleteVendor(vendor.id)} className="border rounded px-2 py-1 text-[10px]">Delete</button>
 
-</span>
 
+</div>
 
 
 </div>
 
 
 </div>
-
 
 
 ))
@@ -357,7 +353,6 @@ vendor.status==="Active"
 }
 
 
-
 </div>
 
 
@@ -365,28 +360,27 @@ vendor.status==="Active"
 
 
 
-
-{/* CREATE FORM */}
-
 {
-
 create &&
-
 
 <CreateVendor
 
 close={()=>setCreate(false)}
 
-addVendor={(data)=>{
+vendorItem={editing}
 
-setVendors([...vendors,data]);
+  addVendor={async (data)=>{
+    setError("");
+    const { error: insertError } = editing
+      ? await supabase.from("vendors").update(data).eq("id", editing.id)
+      : await supabase.from("vendors").insert(data);
+    if (insertError) { setError(insertError.message); return; }
+    setCreate(false);
+    loadVendors();
+  }}
 
-setCreate(false);
-
-}}
 
 />
-
 
 }
 
@@ -395,7 +389,14 @@ setCreate(false);
 </main>
 
 
-)
+
+<SuperAdminFooter/>
+
+
+</>
+
+);
+
 
 }
 
@@ -403,20 +404,24 @@ setCreate(false);
 
 
 
+function CreateVendor({
+
+close,
+addVendor,
+vendorItem
+
+}){
 
 
+const [form,setForm] = useState({
 
-function CreateVendor({close,addVendor}){
-
-
-const [form,setForm]=useState({
-
-name:"",
-category:"",
-location:"",
-phone:"",
-email:"",
-status:"Active"
+name:vendorItem?.business_name || "",
+category:vendorItem?.category || "",
+location:vendorItem?.address || "",
+phone:vendorItem?.mobile_number || "",
+email:vendorItem?.email || "",
+sales_id:vendorItem?.sales_id || "",
+status:vendorItem?.status || "Active"
 
 });
 
@@ -430,19 +435,21 @@ setForm({
 
 [key]:value
 
-})
+});
 
-}
+};
 
 
 
-const enable=
+
+const enable =
 
 form.name &&
 form.category &&
 form.location &&
 form.phone &&
-form.email;
+form.email &&
+form.sales_id;
 
 
 
@@ -450,18 +457,16 @@ const createVendor=()=>{
 
 
 addVendor({
-
-name:form.name,
-
-category:form.category,
-
-location:form.location,
-
-phone:form.phone,
-
-status:form.status
-
-})
+  vendor_id: vendorItem?.vendor_id || `VEN${Date.now()}`,
+  business_name: form.name,
+  owner_name: form.name,
+  category: form.category,
+  mobile_number: form.phone,
+  email: form.email,
+  sales_id: form.sales_id,
+  address: form.location,
+  status: form.status
+});
 
 
 };
@@ -469,12 +474,13 @@ status:form.status
 
 
 
-return(
 
-<div className="
+return (
+
+<div id="create-vendor-form" className="
 bg-white
 rounded-lg
-mt-5
+mt-2
 p-5
 ">
 
@@ -497,7 +503,7 @@ font-bold
 text-[#B97943]
 ">
 
-CREATE VENDOR
+{vendorItem ? "EDIT VENDOR" : "CREATE VENDOR"}
 
 </h2>
 
@@ -508,12 +514,11 @@ CREATE VENDOR
 
 
 
-
 <div className="
 grid
 grid-cols-2
 gap-5
-mt-6
+mt-2
 ">
 
 
@@ -566,6 +571,7 @@ change={(v)=>update("location",v)}
 
 
 
+
 <Input
 
 icon={<Phone size={14}/>}
@@ -597,17 +603,45 @@ change={(v)=>update("email",v)}
 
 />
 
+<Input
+
+icon={<UserRound size={14}/>}
+
+label="Sales ID"
+
+placeholder="Assigned Sales ID"
+
+value={form.sales_id}
+
+change={(v)=>update("sales_id",v)}
+
+/>
 
 
 
-<div>
+</div>
+
+
+
+
+
+<div className="mt-2">
+
 
 <label className="text-[10px]">
+
 Status
+
 </label>
 
 
-<div className="flex gap-5 mt-2 text-xs">
+
+<div className="
+flex
+gap-5
+text-xs
+mt-2
+">
 
 
 <label>
@@ -615,8 +649,6 @@ Status
 <input
 
 type="radio"
-
-name="status"
 
 checked={form.status==="Active"}
 
@@ -636,8 +668,6 @@ onChange={()=>update("status","Active")}
 
 type="radio"
 
-name="status"
-
 checked={form.status==="Inactive"}
 
 onChange={()=>update("status","Inactive")}
@@ -649,11 +679,8 @@ onChange={()=>update("status","Inactive")}
 </label>
 
 
-</div>
-
 
 </div>
-
 
 
 </div>
@@ -668,7 +695,7 @@ onChange={()=>update("status","Inactive")}
 flex
 justify-end
 gap-3
-mt-6
+mt-4
 ">
 
 
@@ -682,11 +709,14 @@ px-5
 py-2
 rounded
 text-xs
-">
+"
+
+>
 
 Cancel
 
 </button>
+
 
 
 
@@ -702,30 +732,26 @@ py-2
 rounded
 text-xs
 text-white
-${
-enable
-?
-"bg-[#172033]"
-:
-"bg-gray-400 cursor-not-allowed"
-}
+${enable
+?"bg-[#172033]"
+:"bg-gray-400"}
 `}
 
 >
 
-Create Vendor
+{vendorItem ? "Save Vendor" : "Create Vendor"}
 
 </button>
 
 
-
 </div>
 
 
+
 </div>
 
+);
 
-)
 
 }
 
@@ -736,21 +762,29 @@ Create Vendor
 
 
 function Input({
+
 icon,
 label,
 placeholder,
 value,
 change
+
 }){
 
 
-return(
+return (
 
 <div>
 
-<label className="text-[10px]">
+
+<label className="
+text-[10px]
+">
+
 {label}
+
 </label>
+
 
 
 <div className="
@@ -767,8 +801,11 @@ px-2
 
 
 <span className="text-gray-400">
+
 {icon}
+
 </span>
+
 
 
 <input
@@ -788,11 +825,15 @@ w-full
 />
 
 
+
 </div>
 
- <SuperAdminFooter />
+
+
 </div>
 
-)
+
+);
+
 
 }
