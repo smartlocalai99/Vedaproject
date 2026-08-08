@@ -14,6 +14,7 @@ import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
+import { friendlyError, showError, showSuccess } from "@/lib/alerts";
 
 
 export default function Member() {
@@ -23,32 +24,49 @@ export default function Member() {
   const sessionRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [editingId, setEditingId] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("salesExecutiveSession");
     if (!saved) { router.replace("/salesexecutive/login"); return; }
-    sessionRef.current = JSON.parse(saved);
+    const session = JSON.parse(saved);
+    sessionRef.current = session;
+    const memberId = router.query.id;
+    if (!memberId) return;
+    async function loadMember() {
+      const { data, error } = await supabase.from("members").select("*").eq("id", memberId).eq("sales_id", session.id).maybeSingle();
+      if (error || !data) { showError("Could not load member", "This member is not available."); return; }
+      setEditingId(data.id);
+      const addressParts = (data.address || "").split(", ");
+      setForm({ full_name: data.full_name || "", mobile_number: data.mobile_number || "", email: data.email || "", dob: data.dob || "", gender: data.gender || "", city: addressParts[0] || "", address: addressParts.slice(1).join(", ") });
+    }
+    loadMember();
   }, [router]);
 
 
   const handleSubmit = async (e)=>{
     e.preventDefault();
     const session = sessionRef.current;
-    if (!session) return;
+    if (!session) return showError("Member creation failed", "Your session has expired. Please log in again.");
+    if (!form.full_name.trim() || !form.mobile_number.trim()) return showError("Member validation error", "Please complete all required fields.");
     setLoading(true); setMessage("");
-    const { data: lastMember, error: cardError } = await supabase.from("members").select("card_number").order("card_number", { ascending: false }).limit(1).maybeSingle();
-    if (cardError) { setLoading(false); setMessage(cardError.message); return; }
+    const { data: lastMember, error: cardError } = editingId ? { data: null, error: null } : await supabase.from("members").select("card_number").order("card_number", { ascending: false }).limit(1).maybeSingle();
+    if (cardError) { setLoading(false); return showError("Member creation failed", friendlyError(cardError, "A member number could not be generated.")); }
     const lastNumber = Number(String(lastMember?.card_number || "VEDA000000").replace(/\D/g, ""));
     const card_number = `VEDA${String(lastNumber + 1).padStart(6, "0")}`;
-    const { error } = await supabase.from("members").insert({
-      card_number, sales_id: session.id, full_name: form.full_name, mobile_number: form.mobile_number,
+    const { data: duplicate } = await supabase.from("members").select("id").eq("mobile_number", form.mobile_number.trim()).neq("id", editingId || "00000000-0000-0000-0000-000000000000").maybeSingle();
+    if (duplicate) { setLoading(false); return showError("Duplicate member", "A member with this mobile number already exists."); }
+    const payload = {
+      sales_id: session.id, full_name: form.full_name.trim(), mobile_number: form.mobile_number.trim(),
       email: form.email || null, dob: form.dob || null, gender: form.gender || null,
       address: [form.city, form.address].filter(Boolean).join(", "), status: "Active",
-    });
+    };
+    if (!editingId) payload.card_number = card_number;
+    const { error } = editingId ? await supabase.from("members").update(payload).eq("id", editingId).eq("sales_id", session.id) : await supabase.from("members").insert(payload);
     setLoading(false);
-    if (error) { setMessage(error.message); return; }
-    setMessage(`Member registered successfully. Card: ${card_number}`);
-    setForm({ full_name: "", mobile_number: "", email: "", dob: "", gender: "", city: "", address: "" });
+    if (error) return showError(editingId ? "Member update failed" : "Member creation failed", friendlyError(error, "The member could not be saved. Please try again."));
+    await showSuccess(editingId ? "Member updated successfully" : "Member created successfully", editingId ? undefined : `Card: ${card_number}`);
+    router.replace("/salesexecutive/members");
   };
 
 return (
@@ -102,7 +120,7 @@ text-m
 font-bold
 text-[#13273c]
 ">
-Member Registration
+{editingId ? "Edit Member" : "Member Registration"}
 </h1>
 
 
@@ -184,7 +202,7 @@ text-lg
 font-bold
 text-gray-800
 ">
-Register Member
+{editingId ? "Edit Member" : "Register Member"}
 </h2>
 
 
@@ -500,7 +518,7 @@ hover:bg-[#1d3b5d]
 
 <CheckCircle size={15}/>
 
-{loading ? "Registering..." : "Register Member"}
+{loading ? "Saving..." : editingId ? "Save Member" : "Register Member"}
 
 
 </button>
@@ -513,9 +531,6 @@ hover:bg-[#1d3b5d]
 
 
 </form>
-
-{message && <p className="mt-3 text-sm text-[#B97943]">{message}</p>}
-
 
 
 </div>

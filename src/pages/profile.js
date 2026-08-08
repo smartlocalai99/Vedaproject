@@ -283,68 +283,6 @@ export default function Profile() {
 
         </div>
 
-        {/* ================= SETTINGS ================= */}
-
-        <div className="bg-white rounded-3xl shadow-sm mt-1 p-2">
-
-          {/* Change Password */}
-
-          <button
-            className="w-full flex items-center justify-between px-4 py-4 rounded-2xl hover:bg-[#F8F5EF] transition"
-          >
-
-            <div className="flex items-center gap-3">
-
-              <div className="w-10 h-10 rounded-xl bg-[#F8F5EF] flex items-center justify-center">
-                <Lock
-                  size={20}
-                  className="text-[#0F1F35]"
-                />
-              </div>
-
-              <span className="font-medium text-[#0F1F35]">
-                Change Password
-              </span>
-
-            </div>
-
-            <ChevronRight
-              size={18}
-              className="text-gray-400"
-            />
-
-          </button>
-
-          {/* Logout */}
-
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-between px-4 py-4 rounded-2xl hover:bg-red-50 transition"
-          >
-
-            <div className="flex items-center gap-3">
-
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-                <LogOut
-                  size={20}
-                  className="text-red-500"
-                />
-              </div>
-
-              <span className="font-medium text-red-500">
-                Logout
-              </span>
-
-            </div>
-
-            <ChevronRight
-              size={18}
-              className="text-red-400"
-            />
-
-          </button>
-
-        </div>
 
       </div>
 

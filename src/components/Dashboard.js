@@ -11,7 +11,7 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-
+import SuperAdminFooter from "@/components/SuperAdminFooter";
 
 export default function Dashboard() {
 
@@ -96,14 +96,6 @@ export default function Dashboard() {
 
       <div className="px-3 pt-3">
 
-        <h2 className="
-        text-sm
-        font-bold
-        text-[#1B2232]
-        ">
-          Dashboard
-        </h2>
-
       </div>
 
 
@@ -125,7 +117,8 @@ gap-2
 
   <Stat
     icon={<UserRound size={18}/>}
-    title="Total Sales Executives"
+    title="Total Sales
+    Executives"
     value={loading ? "..." : stats.sales}
   />
 
@@ -413,7 +406,7 @@ text-sm
 </p>
 
 
-
+<SuperAdminFooter />
 </div>
 
 )

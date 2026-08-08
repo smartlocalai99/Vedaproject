@@ -19,12 +19,12 @@ export default function Footer() {
     {
       title: "Vendor",
       icon: Store,
-      path: "/salesexecutive/vendor",
+      path: "/salesexecutive/vendors",
     },
     {
-      title: "Member",
+      title: "Members",
       icon: Users,
-      path: "/salesexecutive/member",
+      path: "/salesexecutive/members",
     },
     {
       title: "Profile",

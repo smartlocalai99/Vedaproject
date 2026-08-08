@@ -1,4 +1,5 @@
-/* eslint-disable react-hooks/set-state-in-effect */
+
+
 import {
   Store,
   Search,
@@ -14,6 +15,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import SuperAdminFooter from "@/components/SuperAdminFooter";
 import { supabase } from "@/lib/supabase";
+import { confirmDelete, friendlyError, showError, showSuccess } from "@/lib/alerts";
 
 
 export default function Vendors(){
@@ -29,6 +31,7 @@ const [editing, setEditing] = useState(null);
 const [search, setSearch] = useState("");
 const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
+const [salesExecutives, setSalesExecutives] = useState([]);
 
 const loadVendors = async () => {
   setLoading(true);
@@ -39,12 +42,14 @@ const loadVendors = async () => {
 };
 
 useEffect(() => { loadVendors(); }, []);
+useEffect(() => { supabase.from("sales_executives").select("id, employee_id, full_name, status").eq("status", "Active").order("full_name").then(({ data, error: salesError }) => { if (salesError) showError("Could not load Sales IDs", "Sales IDs are unavailable. Please try again."); else setSalesExecutives(data || []); }); }, []);
 
 const deleteVendor = async (id) => {
-  if (!window.confirm("Delete this vendor?")) return;
+  const confirmation = await confirmDelete("Delete vendor?", "This action cannot be undone.");
+  if (!confirmation.isConfirmed) return;
   const { error: deleteError } = await supabase.from("vendors").delete().eq("id", id);
-  if (deleteError) setError(deleteError.message);
-  else loadVendors();
+  if (deleteError) { setError(deleteError.message); showError("Vendor deletion failed", friendlyError(deleteError, "The vendor could not be deleted.")); }
+  else { await showSuccess("Vendor deleted successfully"); loadVendors(); }
 };
 
 const filteredVendors = vendors.filter((vendor) => [vendor.business_name, vendor.category, vendor.address, vendor.mobile_number].filter(Boolean).join(" ").toLowerCase().includes(search.toLowerCase()));
@@ -368,14 +373,20 @@ create &&
 close={()=>setCreate(false)}
 
 vendorItem={editing}
+salesExecutives={salesExecutives}
 
   addVendor={async (data)=>{
     setError("");
+    if (!salesExecutives.some((sales) => sales.id === data.sales_id)) {
+      showError("Invalid Sales ID", "Select a valid active Sales ID.");
+      return;
+    }
     const { error: insertError } = editing
       ? await supabase.from("vendors").update(data).eq("id", editing.id)
       : await supabase.from("vendors").insert(data);
-    if (insertError) { setError(insertError.message); return; }
+    if (insertError) { setError(insertError.message); showError(editing ? "Vendor update failed" : "Vendor creation failed", friendlyError(insertError, "The vendor could not be saved.")); return; }
     setCreate(false);
+    await showSuccess(editing ? "Vendor updated successfully" : "Vendor created successfully");
     loadVendors();
   }}
 
@@ -408,7 +419,8 @@ function CreateVendor({
 
 close,
 addVendor,
-vendorItem
+vendorItem,
+salesExecutives
 
 }){
 
@@ -457,7 +469,7 @@ const createVendor=()=>{
 
 
 addVendor({
-  vendor_id: vendorItem?.vendor_id || `VEN${Date.now()}`,
+  // vendor_id: vendorItem?.vendor_id || `VEN${Date.now()}`,
   business_name: form.name,
   owner_name: form.name,
   category: form.category,
@@ -561,7 +573,7 @@ icon={<MapPin size={14}/>}
 
 label="Location"
 
-placeholder="Kadapa"
+placeholder="location"
 
 value={form.location}
 

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Eye, EyeOff, User, Lock } from "lucide-react";
 import { useRouter } from "next/router";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import { showError } from "@/lib/alerts";
 
 export default function SalesLogin() {
   const router = useRouter();
@@ -12,7 +14,6 @@ export default function SalesLogin() {
     password: "",
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const handleChange = (e) => {
     setForm({
@@ -25,11 +26,10 @@ export default function SalesLogin() {
   e.preventDefault();
 
   if (!form.employeeId || !form.password) {
-    setError("Please enter Employee ID and Password");
+    showError("Missing login fields", "Please enter Employee ID and Password.");
     return;
   }
   setLoading(true);
-  setError("");
   const { data, error: loginError } = await supabase
     .from("sales_executives")
     .select("id, employee_id, full_name, email, mobile_number, assigned_area, status, created_at")
@@ -38,11 +38,11 @@ export default function SalesLogin() {
     .maybeSingle();
   setLoading(false);
   if (loginError) {
-    setError(loginError.message);
+    showError("Login Failed", "We could not sign you in. Please try again.");
     return;
   }
   if (!data || data.status !== "Active") {
-    setError("Invalid credentials or inactive account.");
+    showError("Login Failed", "Invalid Employee ID or password.");
     return;
   }
   localStorage.setItem("salesExecutiveSession", JSON.stringify(data));
@@ -56,9 +56,9 @@ export default function SalesLogin() {
 
         <div className="text-center mb-8">
 
-          <div className="w-20 h-20 bg-[#13273c] rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
 
-            <User className="text-white" size={40} />
+            <Image src="/logo.png" alt="Veda Minds" width={60} height={60} className="object-contain" priority />
 
           </div>
 
@@ -155,13 +155,11 @@ export default function SalesLogin() {
 
         </form>
 
-        {error && <p className="mt-3 text-center text-sm text-red-500">{error}</p>}
-
         <div className="mt-6 text-center">
 
           <button
             className="text-[#b56a38] hover:underline"
-            onClick={() => alert("Contact Administrator")}
+            onClick={() => showError("Forgot Password", "Please contact your administrator to reset your password.")}
           >
             Forgot Password?
           </button>

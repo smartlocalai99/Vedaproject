@@ -1,8 +1,8 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import SuperAdminFooter from "@/components/SuperAdminFooter";
+import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
+import { friendlyError, showError, showSuccess } from "@/lib/alerts";
 
 import {
   CircleUserRound,
@@ -75,9 +75,10 @@ export default function Profile() {
   const handleEdit = async () => {
     if (editing) {
       const { error } = await supabase.from("sales_executives").update({ full_name: profile.name, email: profile.email, mobile_number: profile.phone, assigned_area: profile.address }).eq("id", profileId);
-      if (error) { alert(error.message); return; }
+      if (error) { showError("Profile update failed", friendlyError(error, "Your profile could not be updated.")); return; }
       const saved = JSON.parse(localStorage.getItem("salesExecutiveSession") || "{}");
       localStorage.setItem("salesExecutiveSession", JSON.stringify({ ...saved, full_name: profile.name, email: profile.email, mobile_number: profile.phone, assigned_area: profile.address }));
+      await showSuccess("Profile updated successfully");
     }
 
     setEditing(!editing);
@@ -92,7 +93,7 @@ export default function Profile() {
   /* ================= LOGOUT ================= */
 
   const handleLogout = () => {
-    localStorage.removeItem("employeeProfile");
+    localStorage.removeItem("salesExecutiveSession");
 
     router.push("/salesexecutive/login");
   };
@@ -504,7 +505,7 @@ export default function Profile() {
 
       {/* ================= FOOTER ================= */}
 
-      <SuperAdminFooter />
+      <Footer />
 
     </div>
   );
