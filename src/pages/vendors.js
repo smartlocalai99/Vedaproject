@@ -377,10 +377,14 @@ salesExecutives={salesExecutives}
 
   addVendor={async (data)=>{
     setError("");
-    if (!salesExecutives.some((sales) => sales.id === data.sales_id)) {
-      showError("Invalid Sales ID", "Select a valid active Sales ID.");
-      return;
-    }
+
+    if (
+  data.sales_id &&
+  !salesExecutives.some((sales) => sales.id === data.sales_id)
+) {
+  showError("Invalid Sales ID", "Select a valid active Sales ID.");
+  return;
+}
     const { error: insertError } = editing
       ? await supabase.from("vendors").update(data).eq("id", editing.id)
       : await supabase.from("vendors").insert(data);
@@ -460,8 +464,8 @@ form.name &&
 form.category &&
 form.location &&
 form.phone &&
-form.email &&
-form.sales_id;
+form.email ;
+// form.sales_id;
 
 
 
@@ -475,7 +479,7 @@ addVendor({
   category: form.category,
   mobile_number: form.phone,
   email: form.email,
-  sales_id: form.sales_id,
+  sales_id: form.sales_id || null,
   address: form.location,
   status: form.status
 });
@@ -849,3 +853,8 @@ w-full
 
 
 }
+
+
+
+
+
