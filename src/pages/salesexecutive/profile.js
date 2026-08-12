@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
-import { friendlyError, showError, showSuccess } from "@/lib/alerts";
+import {
+  friendlyError,
+  showError,
+  showSuccess,
+} from "@/lib/alerts";
 
 import {
   CircleUserRound,
@@ -12,6 +16,7 @@ import {
   LogOut,
   ChevronRight,
   Camera,
+  Lock,
   Briefcase,
   Calendar,
   MapPin,
@@ -20,6 +25,7 @@ import {
 
 export default function Profile() {
   const router = useRouter();
+
   const [editing, setEditing] = useState(false);
   const [profileId, setProfileId] = useState("");
 
@@ -35,109 +41,435 @@ export default function Profile() {
     image: "",
   });
 
+  /* =========================================================
+     LOAD PROFILE
+  ========================================================= */
+
   useEffect(() => {
-    const saved = localStorage.getItem("salesExecutiveSession");
-    if (!saved) { router.replace("/salesexecutive/login"); return; }
-    const session = JSON.parse(saved);
-    setProfileId(session.id);
-    async function loadProfile() {
-      const { data } = await supabase.from("sales_executives").select("*").eq("id", session.id).maybeSingle();
-      if (!data) return;
-      setProfile((current) => ({ ...current, name: data.full_name || "", employeeId: data.employee_id || "", email: data.email || "", phone: data.mobile_number || "", address: data.assigned_area || "", joiningDate: data.created_at ? new Date(data.created_at).toLocaleDateString("en-IN") : "" }));
+    const saved = localStorage.getItem(
+      "salesExecutiveSession"
+    );
+
+    if (!saved) {
+      router.replace("/salesexecutive/login");
+      return;
     }
+
+    let session;
+
+    try {
+      session = JSON.parse(saved);
+    } catch (error) {
+      console.log(
+        "SESSION PARSE ERROR:",
+        error
+      );
+
+      localStorage.removeItem(
+        "salesExecutiveSession"
+      );
+
+      router.replace("/salesexecutive/login");
+      return;
+    }
+
+    if (!session?.id) {
+      router.replace("/salesexecutive/login");
+      return;
+    }
+
+    setProfileId(session.id);
+
+    /* =========================================================
+       LOAD SAVED PROFILE IMAGE
+    ========================================================= */
+
+    const savedProfileImage =
+      localStorage.getItem(
+        `salesExecutiveProfileImage_${session.id}`
+      );
+
+    if (savedProfileImage) {
+      setProfile((current) => ({
+        ...current,
+        image: savedProfileImage,
+      }));
+    }
+
+    async function loadProfile() {
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("sales_executives")
+        .select("*")
+        .eq("id", session.id)
+        .maybeSingle();
+
+      if (error) {
+        console.log(
+          "PROFILE LOAD ERROR:",
+          error
+        );
+        return;
+      }
+
+      if (!data) {
+        return;
+      }
+
+      setProfile((current) => ({
+        ...current,
+
+        name:
+          data.full_name ||
+          current.name,
+
+        employeeId:
+          data.employee_id ||
+          current.employeeId,
+
+        email:
+          data.email ||
+          current.email,
+
+        phone:
+          data.mobile_number ||
+          current.phone,
+
+        address:
+          data.assigned_area ||
+          current.address,
+
+        joiningDate:
+          data.created_at
+            ? new Date(
+                data.created_at
+              ).toLocaleDateString(
+                "en-IN"
+              )
+            : current.joiningDate,
+
+        /*
+         * KEEP THE LOCAL PROFILE IMAGE.
+         *
+         * Supabase profile data does not
+         * overwrite the locally saved image.
+         */
+        image:
+          localStorage.getItem(
+            `salesExecutiveProfileImage_${session.id}`
+          ) || current.image,
+      }));
+    }
+
     loadProfile();
   }, [router]);
 
-  /* ================= IMAGE UPLOAD ================= */
+  /* =========================================================
+     IMAGE UPLOAD
+  ========================================================= */
 
   const handleImage = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
 
-    if (file) {
-      setProfile({
-        ...profile,
-        image: URL.createObjectURL(file),
-      });
+    if (!file) {
+      return;
     }
+
+    /*
+     * CHECK FILE TYPE
+     */
+
+    if (!file.type.startsWith("image/")) {
+      showError(
+        "Invalid Image",
+        "Please select a valid image file."
+      );
+
+      return;
+    }
+
+    /*
+     * CHECK FILE SIZE
+     *
+     * Maximum 5 MB
+     */
+
+    if (file.size > 5 * 1024 * 1024) {
+      showError(
+        "Image Too Large",
+        "Please select an image smaller than 5 MB."
+      );
+
+      return;
+    }
+
+    /*
+     * READ IMAGE AS BASE64
+     *
+     * This is important because
+     * URL.createObjectURL() disappears
+     * after page refresh/logout.
+     */
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const imageData =
+        reader.result;
+
+      if (
+        typeof imageData !==
+        "string"
+      ) {
+        showError(
+          "Image Error",
+          "Unable to process the selected image."
+        );
+
+        return;
+      }
+
+      /*
+       * SHOW IMAGE IMMEDIATELY
+       */
+
+      setProfile((current) => ({
+        ...current,
+        image: imageData,
+      }));
+
+      /*
+       * SAVE IMAGE PER SALES EXECUTIVE
+       */
+
+      if (profileId) {
+        try {
+          localStorage.setItem(
+            `salesExecutiveProfileImage_${profileId}`,
+            imageData
+          );
+        } catch (error) {
+          console.log(
+            "PROFILE IMAGE STORAGE ERROR:",
+            error
+          );
+
+          showError(
+            "Image Error",
+            "The image could not be saved. Please try a smaller image."
+          );
+        }
+      }
+    };
+
+    reader.onerror = () => {
+      showError(
+        "Image Error",
+        "Unable to read the selected image."
+      );
+    };
+
+    reader.readAsDataURL(file);
   };
 
-  /* ================= UPDATE PROFILE ================= */
+  /* =========================================================
+     UPDATE PROFILE STATE
+  ========================================================= */
 
-  const updateProfile = (field, value) => {
-    setProfile({
-      ...profile,
+  const updateProfile = (
+    field,
+    value
+  ) => {
+    setProfile((current) => ({
+      ...current,
       [field]: value,
-    });
+    }));
   };
 
-  /* ================= EDIT / SAVE ================= */
+  /* =========================================================
+     ENTER EDIT MODE
+  ========================================================= */
 
-  const handleEdit = async () => {
-    if (editing) {
-      const { error } = await supabase.from("sales_executives").update({ full_name: profile.name, email: profile.email, mobile_number: profile.phone, assigned_area: profile.address }).eq("id", profileId);
-      if (error) { showError("Profile update failed", friendlyError(error, "Your profile could not be updated.")); return; }
-      const saved = JSON.parse(localStorage.getItem("salesExecutiveSession") || "{}");
-      localStorage.setItem("salesExecutiveSession", JSON.stringify({ ...saved, full_name: profile.name, email: profile.email, mobile_number: profile.phone, assigned_area: profile.address }));
-      await showSuccess("Profile updated successfully");
+  const handleEdit = () => {
+    setEditing(true);
+  };
+
+  /* =========================================================
+     SAVE CHANGES
+  ========================================================= */
+
+  const handleSave = async () => {
+    if (!profileId) {
+      showError(
+        "Profile Error",
+        "Unable to identify your profile."
+      );
+
+      return;
     }
 
-    setEditing(!editing);
+    const {
+      error,
+    } = await supabase
+      .from("sales_executives")
+      .update({
+        full_name: profile.name,
+        email: profile.email,
+        mobile_number: profile.phone,
+        assigned_area: profile.address,
+      })
+      .eq("id", profileId);
+
+    if (error) {
+      console.log(
+        "PROFILE UPDATE ERROR:",
+        error
+      );
+
+      showError(
+        "Profile update failed",
+        friendlyError(
+          error,
+          "Your profile could not be updated."
+        )
+      );
+
+      return;
+    }
+
+    /* =========================================================
+       UPDATE LOCAL SESSION
+    ========================================================= */
+
+    const saved =
+      JSON.parse(
+        localStorage.getItem(
+          "salesExecutiveSession"
+        ) || "{}"
+      );
+
+    localStorage.setItem(
+      "salesExecutiveSession",
+      JSON.stringify({
+        ...saved,
+        full_name: profile.name,
+        email: profile.email,
+        mobile_number: profile.phone,
+        assigned_area: profile.address,
+      })
+    );
+
+    /* =========================================================
+       KEEP PROFILE IMAGE SAVED
+    ========================================================= */
+
+    if (profile.image) {
+      try {
+        localStorage.setItem(
+          `salesExecutiveProfileImage_${profileId}`,
+          profile.image
+        );
+      } catch (error) {
+        console.log(
+          "PROFILE IMAGE SAVE ERROR:",
+          error
+        );
+      }
+    }
+
+    setEditing(false);
+
+    await showSuccess(
+      "Profile updated successfully"
+    );
   };
 
-  /* ================= CONTACT ADMIN ================= */
+  /* =========================================================
+     CONTACT ADMIN
+  ========================================================= */
 
   const contactAdmin = () => {
-    window.location.href = "tel:+919876543210";
+    window.location.href =
+      "tel:+919876543210";
   };
 
-  /* ================= LOGOUT ================= */
+  /* =========================================================
+     LOGOUT
+  ========================================================= */
 
   const handleLogout = () => {
-    localStorage.removeItem("salesExecutiveSession");
+    /*
+     * IMPORTANT:
+     *
+     * Only remove the LOGIN SESSION.
+     *
+     * DO NOT remove:
+     *
+     * salesExecutiveProfileImage_PROFILE_ID
+     *
+     * Therefore the profile image
+     * remains after logout/login.
+     */
 
-    router.push("/salesexecutive/login");
+    localStorage.removeItem(
+      "salesExecutiveSession"
+    );
+
+    router.push(
+      "/salesexecutive/login"
+    );
   };
 
   return (
     <div className="min-h-screen bg-[#F5F6F8]">
 
-      {/* ================= MAIN CONTENT ================= */}
+      {/* =====================================================
+          MAIN CONTENT
+      ===================================================== */}
 
-      <div className="px-4 py-5 pb-28">
+      <div className="px-4 py-5 pb-32">
 
-        {/* ================= PAGE TITLE ================= */}
+        {/* ===================================================
+            PAGE TITLE
+        =================================================== */}
 
         <h2 className="text-xl font-bold text-[#0F1F35]">
           My Profile
         </h2>
 
-        {/* ================= PROFILE CARD ================= */}
+        {/* ===================================================
+            PROFILE CARD
+        =================================================== */}
 
         <div className="bg-white rounded-3xl p-4 mt-2 relative">
 
-          {/* Edit / Save Button */}
+          {/* =================================================
+              TOP RIGHT PENCIL
+          ================================================= */}
 
-          <button
-            onClick={handleEdit}
-            className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-[#F8F5EF] flex items-center justify-center hover:bg-[#eee8dc] transition"
-          >
-            {editing ? (
-              <span className="text-xs font-semibold text-[#B67A43]">
-                Save
-              </span>
-            ) : (
+          {!editing && (
+            <button
+              onClick={handleEdit}
+              className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-[#F8F5EF] flex items-center justify-center hover:bg-[#eee8dc] transition"
+            >
               <Pencil
                 size={17}
                 className="text-[#0F1F35]"
               />
-            )}
-          </button>
+            </button>
+          )}
 
-          {/* Profile Content */}
+          {/* =================================================
+              PROFILE CONTENT
+          ================================================= */}
 
           <div className="flex items-center gap-4">
 
-            {/* ================= PROFILE IMAGE ================= */}
+            {/* ===============================================
+                PROFILE IMAGE
+            =============================================== */}
 
             <div className="relative shrink-0">
 
@@ -146,10 +478,10 @@ export default function Profile() {
                 <img
                   src={profile.image}
                   alt="Profile"
-                  className="w-15 h-15 rounded-full object-cover border-4 border-[#0F1F35]"
+                  className="w-[60px] h-[60px] rounded-full object-cover border-1 border-white"
                 />
               ) : (
-                <div className="w-15 h-15 rounded-full bg-[#0F1F35] flex items-center justify-center">
+                <div className="w-[60px] h-[60px] rounded-full bg-[#0F1F35] flex items-center justify-center">
                   <CircleUserRound
                     size={35}
                     className="text-white"
@@ -157,7 +489,7 @@ export default function Profile() {
                 </div>
               )}
 
-              {/* Camera Button */}
+              {/* CAMERA BUTTON */}
 
               {editing && (
                 <>
@@ -166,7 +498,9 @@ export default function Profile() {
                     id="profileImage"
                     accept="image/*"
                     hidden
-                    onChange={handleImage}
+                    onChange={
+                      handleImage
+                    }
                   />
 
                   <label
@@ -183,15 +517,20 @@ export default function Profile() {
 
             </div>
 
-            {/* ================= NAME + ROLE ================= */}
+            {/* ===============================================
+                NAME + ROLE
+            =============================================== */}
 
-            <div className="flex-1 pr-10">
+            <div className="flex-1 min-w-0">
 
               {editing ? (
                 <input
                   value={profile.name}
                   onChange={(e) =>
-                    updateProfile("name", e.target.value)
+                    updateProfile(
+                      "name",
+                      e.target.value
+                    )
                   }
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-base font-bold text-[#0F1F35] outline-none focus:ring-2 focus:ring-[#B67A43]"
                 />
@@ -211,11 +550,15 @@ export default function Profile() {
 
         </div>
 
-        {/* ================= PROFILE DETAILS ================= */}
+        {/* ===================================================
+            PROFILE DETAILS
+        =================================================== */}
 
         <div className="bg-white rounded-3xl shadow-sm mt-2 p-5 space-y-6">
 
-          {/* ================= EMPLOYEE ID ================= */}
+          {/* =================================================
+              EMPLOYEE ID
+          ================================================= */}
 
           <div className="flex items-start gap-4">
 
@@ -240,7 +583,9 @@ export default function Profile() {
 
           </div>
 
-          {/* ================= DESIGNATION ================= */}
+          {/* =================================================
+              DESIGNATION
+          ================================================= */}
 
           <div className="flex items-start gap-4">
 
@@ -260,7 +605,9 @@ export default function Profile() {
               {editing ? (
                 <input
                   type="text"
-                  value={profile.designation}
+                  value={
+                    profile.designation
+                  }
                   onChange={(e) =>
                     updateProfile(
                       "designation",
@@ -279,7 +626,9 @@ export default function Profile() {
 
           </div>
 
-          {/* ================= MOBILE ================= */}
+          {/* =================================================
+              MOBILE
+          ================================================= */}
 
           <div className="flex items-start gap-4">
 
@@ -318,7 +667,9 @@ export default function Profile() {
 
           </div>
 
-          {/* ================= EMAIL ================= */}
+          {/* =================================================
+              EMAIL
+          ================================================= */}
 
           <div className="flex items-start gap-4">
 
@@ -329,7 +680,7 @@ export default function Profile() {
               />
             </div>
 
-            <div className="flex-1 ">
+            <div className="flex-1">
 
               <p className="text-xs text-gray-500 mb-1">
                 Email
@@ -357,7 +708,9 @@ export default function Profile() {
 
           </div>
 
-          {/* ================= JOINING DATE ================= */}
+          {/* =================================================
+              JOINING DATE
+          ================================================= */}
 
           <div className="flex items-start gap-4">
 
@@ -377,7 +730,9 @@ export default function Profile() {
               {editing ? (
                 <input
                   type="text"
-                  value={profile.joiningDate}
+                  value={
+                    profile.joiningDate
+                  }
                   onChange={(e) =>
                     updateProfile(
                       "joiningDate",
@@ -396,7 +751,9 @@ export default function Profile() {
 
           </div>
 
-          {/* ================= ADDRESS ================= */}
+          {/* =================================================
+              ADDRESS
+          ================================================= */}
 
           <div className="flex items-start gap-4">
 
@@ -437,11 +794,65 @@ export default function Profile() {
 
         </div>
 
-        {/* ================= SETTINGS ================= */}
+        {/* ===================================================
+            SAVE CHANGES
+        =================================================== */}
+
+        {editing && (
+          <button
+            onClick={handleSave}
+            className="w-full mt-5 h-14 rounded-2xl bg-[#B67A43] text-white text-[17px] font-bold hover:bg-[#9F6939] transition"
+          >
+            Save Changes
+          </button>
+        )}
+
+        {/* ===================================================
+            SETTINGS
+        =================================================== */}
 
         <div className="bg-white rounded-3xl shadow-sm mt-2 p-2">
 
-          {/* ================= CONTACT ADMIN ================= */}
+          {/* =================================================
+              CHANGE PASSWORD
+          ================================================= */}
+
+          <button
+            onClick={() =>
+              router.push(
+                "/salesexecutive/change-password"
+              )
+            }
+            className="w-full flex items-center justify-between px-4 py-4 rounded-2xl hover:bg-[#F8F5EF] transition"
+          >
+
+            <div className="flex items-center gap-3">
+
+              <div className="w-10 h-10 rounded-xl bg-[#F8F5EF] flex items-center justify-center">
+
+                <Lock
+                  size={20}
+                  className="text-[#0F1F35]"
+                />
+
+              </div>
+
+              <span className="font-medium text-[#0F1F35]">
+                Change Password
+              </span>
+
+            </div>
+
+            <ChevronRight
+              size={18}
+              className="text-gray-400"
+            />
+
+          </button>
+
+          {/* =================================================
+              CONTACT ADMIN
+          ================================================= */}
 
           <button
             onClick={contactAdmin}
@@ -451,10 +862,12 @@ export default function Profile() {
             <div className="flex items-center gap-3">
 
               <div className="w-10 h-10 rounded-xl bg-[#F8F5EF] flex items-center justify-center">
+
                 <Phone
                   size={20}
                   className="text-[#0F1F35]"
                 />
+
               </div>
 
               <span className="font-medium text-[#0F1F35]">
@@ -470,7 +883,9 @@ export default function Profile() {
 
           </button>
 
-          {/* ================= LOGOUT ================= */}
+          {/* =================================================
+              LOGOUT
+          ================================================= */}
 
           <button
             onClick={handleLogout}
@@ -480,10 +895,12 @@ export default function Profile() {
             <div className="flex items-center gap-3">
 
               <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+
                 <LogOut
                   size={20}
                   className="text-red-500"
                 />
+
               </div>
 
               <span className="font-medium text-red-500">
@@ -503,7 +920,9 @@ export default function Profile() {
 
       </div>
 
-      {/* ================= FOOTER ================= */}
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
 
       <Footer />
 

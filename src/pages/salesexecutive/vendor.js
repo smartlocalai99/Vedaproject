@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
 import Swal from "sweetalert2";
+
 import {
   friendlyError,
   showError,
@@ -33,15 +34,26 @@ export default function Vendor() {
     email: "",
     city: "",
     address: "",
+    offer_percentage: "",
     password: "",
     confirm_password: "",
   });
 
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
+
+  const [salesExecutive, setSalesExecutive] =
+    useState(null);
+
+  /* =========================
+     LOAD SESSION + VENDOR
+  ========================= */
 
   useEffect(() => {
     const saved = localStorage.getItem(
@@ -54,6 +66,36 @@ export default function Vendor() {
     }
 
     const session = JSON.parse(saved);
+
+    /* =========================
+       LOAD SALES EXECUTIVE
+    ========================= */
+
+    async function loadSalesExecutive() {
+      const { data, error } = await supabase
+        .from("sales_executives")
+        .select("*")
+        .eq("id", session.id)
+        .maybeSingle();
+
+      if (error) {
+        console.log(
+          "SALES EXECUTIVE LOAD ERROR:",
+          error
+        );
+        return;
+      }
+
+      if (data) {
+        setSalesExecutive(data);
+      }
+    }
+
+    loadSalesExecutive();
+
+    /* =========================
+       LOAD VENDOR FOR EDIT
+    ========================= */
 
     const vendorId = router.query.id;
 
@@ -77,23 +119,52 @@ export default function Vendor() {
 
       setEditingId(data.id);
 
-      const addressParts = (data.address || "").split(", ");
+      const addressParts = (
+        data.address || ""
+      ).split(", ");
 
       setForm({
-        business_name: data.business_name || "",
-        category: data.category || "",
-        owner_name: data.owner_name || "",
-        mobile_number: data.mobile_number || "",
-        email: data.email || "",
-        city: addressParts[0] || "",
-        address: addressParts.slice(1).join(", "),
-        password: data.password || "",
-        confirm_password: data.password || "",
+        business_name:
+          data.business_name || "",
+
+        category:
+          data.category || "",
+
+        owner_name:
+          data.owner_name || "",
+
+        mobile_number:
+          data.mobile_number || "",
+
+        email:
+          data.email || "",
+
+        city:
+          addressParts[0] || "",
+
+        address:
+          addressParts.slice(1).join(", "),
+
+        offer_percentage:
+          data.offer_percentage !== null &&
+          data.offer_percentage !== undefined
+            ? String(data.offer_percentage)
+            : "",
+
+        password:
+          data.password || "",
+
+        confirm_password:
+          data.password || "",
       });
     }
 
     loadVendor();
   }, [router]);
+
+  /* =========================
+     HANDLE CHANGE
+  ========================= */
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -103,6 +174,94 @@ export default function Vendor() {
       [name]: value,
     }));
   };
+
+  /* =========================
+     SEND WHATSAPP
+  ========================= */
+
+  const sendVendorCredentials = async () => {
+    const vendorMobile =
+      form.mobile_number.replace(/\D/g, "");
+
+    if (!vendorMobile) {
+      showError(
+        "Mobile number missing",
+        "Vendor mobile number is required to send WhatsApp credentials."
+      );
+      return;
+    }
+
+    /*
+     * Indian number
+     *
+     * 9876543210
+     * becomes
+     * 919876543210
+     */
+
+    const whatsappNumber =
+      vendorMobile.length === 10
+        ? `91${vendorMobile}`
+        : vendorMobile;
+
+    /*
+     * Sales Executive details
+     *
+     * This is the actual logged-in
+     * Sales Executive, not a dummy number.
+     */
+
+    const salesName =
+      salesExecutive?.full_name ||
+      "Veda Sales Executive";
+
+    const salesMobile =
+      salesExecutive?.mobile_number ||
+      "";
+
+    /*
+     * NO EMAIL IN MESSAGE
+     */
+
+    const message = [
+      `*Hello ${form.business_name}*,`,
+      "",
+      "Welcome to *Veda Vendor*.",
+      "",
+      "Your Veda Vendor App login credentials are:",
+      "",
+      `*Mobile Number:* ${form.mobile_number}`,
+      `*Password:* ${form.password}`,
+      "",
+      "Please use your mobile number and password to log in to the Veda Vendor App.",
+      "",
+      "For security, please change your password after your first login.",
+      "",
+      `Sales Executive: ${salesName}`,
+      salesMobile
+        ? `Contact: ${salesMobile}`
+        : "",
+      "",
+      "Thank you,",
+      "*Veda Team*",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const whatsappUrl =
+      `https://wa.me/${whatsappNumber}` +
+      `?text=${encodeURIComponent(message)}`;
+
+    window.open(
+      whatsappUrl,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  /* =========================
+     SUBMIT
+  ========================= */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -119,6 +278,10 @@ export default function Vendor() {
     }
 
     const session = JSON.parse(saved);
+
+    /* =========================
+       VALIDATION
+    ========================= */
 
     if (
       !form.business_name.trim() ||
@@ -153,7 +316,8 @@ export default function Vendor() {
     }
 
     if (
-      form.password !== form.confirm_password
+      form.password !==
+      form.confirm_password
     ) {
       return showError(
         "Password mismatch",
@@ -161,32 +325,92 @@ export default function Vendor() {
       );
     }
 
+    /* =========================
+       MOBILE VALIDATION
+    ========================= */
+
+    const cleanMobile =
+      form.mobile_number.replace(/\D/g, "");
+
+    if (cleanMobile.length !== 10) {
+      return showError(
+        "Invalid mobile number",
+        "Please enter a valid 10-digit vendor mobile number."
+      );
+    }
+
+    /* =========================
+       OFFER VALIDATION
+    ========================= */
+
+    let offerPercentage = null;
+
+    if (
+      form.offer_percentage !== "" &&
+      form.offer_percentage !== null
+    ) {
+      offerPercentage =
+        Number(form.offer_percentage);
+
+      if (
+        !Number.isFinite(
+          offerPercentage
+        ) ||
+        offerPercentage < 0 ||
+        offerPercentage > 100
+      ) {
+        return showError(
+          "Invalid offer",
+          "Offer percentage must be between 0 and 100."
+        );
+      }
+    }
+
     setLoading(true);
+
+    /* =========================
+       PAYLOAD
+    ========================= */
 
     const payload = {
       sales_id: session.id,
+
       business_name:
         form.business_name.trim(),
+
       category:
         form.category.trim() || null,
+
       owner_name:
         form.owner_name.trim(),
+
       mobile_number:
-        form.mobile_number.trim(),
+        cleanMobile,
+
       email:
         form.email.trim() || null,
+
       address: [
         form.city.trim(),
         form.address.trim(),
       ]
         .filter(Boolean)
         .join(", "),
+
+      offer_percentage:
+        offerPercentage,
+
       password:
         form.password,
+
       status: "Active",
     };
 
     let result;
+
+    /* =========================
+       UPDATE
+    ========================= */
 
     if (editingId) {
       result = await supabase
@@ -194,7 +418,13 @@ export default function Vendor() {
         .update(payload)
         .eq("id", editingId)
         .eq("sales_id", session.id);
-    } else {
+    }
+
+    /* =========================
+       INSERT
+    ========================= */
+
+    else {
       result = await supabase
         .from("vendors")
         .insert(payload);
@@ -202,11 +432,16 @@ export default function Vendor() {
 
     setLoading(false);
 
+    /* =========================
+       ERROR
+    ========================= */
+
     if (result.error) {
       return showError(
         editingId
           ? "Vendor update failed"
           : "Vendor creation failed",
+
         friendlyError(
           result.error,
           "The vendor could not be saved. Please try again."
@@ -214,58 +449,53 @@ export default function Vendor() {
       );
     }
 
+    /* =========================
+       EDIT SUCCESS
+    ========================= */
+
     if (editingId) {
-      await showSuccess("Vendor updated successfully");
-    } else {
-      const mobile =
-        form.mobile_number.replace(/\D/g, "");
+      await showSuccess(
+        "Vendor updated successfully"
+      );
 
-      const whatsappNumber =
-        mobile.length === 10
-          ? `91${mobile}`
-          : mobile;
+      router.replace(
+        "/salesexecutive/vendors"
+      );
 
-      const message = [
-        `*Hello ${form.business_name} \u{1F44B}*`,
-        "",
-        "Welcome to *Veda Vendor*.",
-        "",
-        "Your Veda Vendor App login credentials are:",
-        "",
-        `*Email:* ${form.email}`,
-        `*Password:* ${form.password}`,
-        "",
-        "Please use these credentials to log in to the Veda Vendor App.",
-        "",
-        "For security, please change your password after your first login.",
-        "",
-        "Thank you,",
-        "*Veda Team*",
-      ].join("\n");
+      return;
+    }
 
-      const whatsappUrl =
-        `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
-          message
-        )}`;
+    /* =========================
+       NEW VENDOR
+    ========================= */
 
-      const shareResult = await Swal.fire({
+    const shareResult =
+      await Swal.fire({
         icon: "success",
-        title: "Vendor registered successfully",
-        text: "Share the new vendor's login credentials on WhatsApp.",
+
+        title:
+          "Vendor registered successfully",
+
+        text:
+          "Send the vendor's login credentials through WhatsApp.",
+
         showCancelButton: true,
-        confirmButtonText: "Share on WhatsApp",
-        cancelButtonText: "Done",
-        confirmButtonColor: "#13273c",
-        cancelButtonColor: "#6b7280",
+
+        confirmButtonText:
+          "Share on WhatsApp",
+
+        cancelButtonText:
+          "Done",
+
+        confirmButtonColor:
+          "#13273c",
+
+        cancelButtonColor:
+          "#6b7280",
       });
 
-      if (shareResult.isConfirmed) {
-        window.open(
-          whatsappUrl,
-          "_blank",
-          "noopener,noreferrer"
-        );
-      }
+    if (shareResult.isConfirmed) {
+      sendVendorCredentials();
     }
 
     router.replace(
@@ -278,7 +508,7 @@ export default function Vendor() {
 
       <main className="pb-20">
 
-        {/* Header */}
+        {/* ================= HEADER ================= */}
 
         <div className="bg-white border-b border-gray-100">
 
@@ -300,226 +530,231 @@ export default function Vendor() {
             </button>
 
             <div>
-              <h1 className="
-                text-[14px]
-                font-bold
-                text-[#13273c]
-              ">
-                {editingId
-                  ? "Vendor Registration"
-                  : "Vendor Registration"}
+
+              <h1
+                className="
+                  text-[14px]
+                  font-bold
+                  text-[#13273c]
+                "
+              >
+                Vendor Registration
               </h1>
 
-              <p className="
-                text-[9px]
-                text-gray-500
-              ">
+              <p
+                className="
+                  text-[9px]
+                  text-gray-500
+                "
+              >
                 Add new vendor details
               </p>
+
             </div>
 
           </div>
 
         </div>
 
-        {/* Registration Card */}
+        {/* ================= REGISTRATION CARD ================= */}
 
         <div className="px-2 pt-3">
 
-          <div className="
-            bg-white
-            rounded-xl
-            px-3
-            py-4
-            shadow-sm
-          ">
+          <div
+            className="
+              bg-white
+              rounded-xl
+              px-3
+              py-4
+              shadow-sm
+            "
+          >
 
-            {/* Card Header */}
+            {/* CARD HEADER */}
 
-            <div className="
-              flex
-              items-center
-              gap-2
-              mb-4
-            ">
-
-              <div className="
-                w-8
-                h-8
-                rounded-full
-                bg-orange-500
+            <div
+              className="
                 flex
                 items-center
-                justify-center
-                text-white
-              ">
+                gap-2
+                mb-4
+              "
+            >
+
+              <div
+                className="
+                  w-8
+                  h-8
+                  rounded-full
+                  bg-orange-500
+                  flex
+                  items-center
+                  justify-center
+                  text-white
+                "
+              >
                 <Store size={17} />
               </div>
 
               <div>
-                <h2 className="
-                  text-[12px]
-                  font-bold
-                  text-[#13273c]
-                ">
+
+                <h2
+                  className="
+                    text-[12px]
+                    font-bold
+                    text-[#13273c]
+                  "
+                >
                   {editingId
                     ? "Edit Vendor"
                     : "Register Vendor"}
                 </h2>
 
-                <p className="
-                  text-[8px]
-                  text-gray-500
-                ">
+                <p
+                  className="
+                    text-[8px]
+                    text-gray-500
+                  "
+                >
                   Enter vendor information
                 </p>
+
               </div>
 
             </div>
+
+            {/* ================= FORM ================= */}
 
             <form onSubmit={handleSubmit}>
 
               <div className="grid grid-cols-2 gap-3">
 
-  {/* Business Name */}
-  <InputBox
-    icon={<Store size={12} />}
-    label="Business Name"
-    placeholder="Enter business name"
-    type="text"
-    name="business_name"
-    value={form.business_name}
-    onChange={handleChange}
-    required
-  />
+                <InputBox
+                  icon={<Store size={12} />}
+                  label="Business Name"
+                  placeholder="Enter business name"
+                  type="text"
+                  name="business_name"
+                  value={form.business_name}
+                  onChange={handleChange}
+                  required
+                />
 
-  {/* Category */}
-  <InputBox
-    icon={<Store size={12} />}
-    label="Category"
-    placeholder="Restaurant, Hotel, Shopping..."
-    type="text"
-    name="category"
-    value={form.category}
-    onChange={handleChange}
-    required={false}
-  />
+                <InputBox
+                  icon={<Store size={12} />}
+                  label="Category"
+                  placeholder="Restaurant, Hotel, Shopping..."
+                  type="text"
+                  name="category"
+                  value={form.category}
+                  onChange={handleChange}
+                  required={false}
+                />
 
-  {/* Owner Name */}
-  <InputBox
-    icon={<User size={12} />}
-    label="Owner Name"
-    placeholder="Enter owner name"
-    type="text"
-    name="owner_name"
-    value={form.owner_name}
-    onChange={handleChange}
-    required
-  />
+                <InputBox
+                  icon={<User size={12} />}
+                  label="Owner Name"
+                  placeholder="Enter owner name"
+                  type="text"
+                  name="owner_name"
+                  value={form.owner_name}
+                  onChange={handleChange}
+                  required
+                />
 
-  {/* Mobile */}
-  <InputBox
-    icon={<Phone size={12} />}
-    label="Mobile Number"
-    placeholder="mobile number"
-    type="tel"
-    name="mobile_number"
-    value={form.mobile_number}
-    onChange={handleChange}
-    required
-  />
+                <InputBox
+                  icon={<Phone size={12} />}
+                  label="Mobile Number"
+                  placeholder="10-digit mobile number"
+                  type="tel"
+                  name="mobile_number"
+                  value={form.mobile_number}
+                  onChange={handleChange}
+                  required
+                />
 
-  {/* Email */}
-  <InputBox
-    icon={<Mail size={12} />}
-    label="Email Address"
-    placeholder="example@gmail.com"
-    type="email"
-    name="email"
-    value={form.email}
-    onChange={handleChange}
-    required={false}
-  />
+                <InputBox
+                  icon={<Mail size={12} />}
+                  label="Email Address"
+                  placeholder="example@gmail.com"
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  required={false}
+                />
 
-  {/* City */}
-  <InputBox
-    icon={<MapPin size={12} />}
-    label="City"
-    placeholder="city"
-    type="text"
-    name="city"
-    value={form.city}
-    onChange={handleChange}
-    required={false}
-  />
+                <InputBox
+                  icon={<MapPin size={12} />}
+                  label="City"
+                  placeholder="City"
+                  type="text"
+                  name="city"
+                  value={form.city}
+                  onChange={handleChange}
+                  required={false}
+                />
 
-  {/* Address - full width */}
-  <div className="col-span-2">
+                <InputBox
+                  icon={<MapPin size={14} />}
+                  label="Address"
+                  placeholder="Enter complete address"
+                  type="text"
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                  required={false}
+                />
 
-    <label className="
-      text-[9px]
-      font-semibold
-      text-[#13273c]
-    ">
-      Address
-    </label>
+                <InputBox
+                  icon={null}
+                  label="Offer Percentage"
+                  placeholder="Enter %"
+                  type="number"
+                  name="offer_percentage"
+                  value={form.offer_percentage}
+                  onChange={handleChange}
+                  required={false}
+                />
 
-    <textarea
-      rows="3"
-      name="address"
-      placeholder="Enter complete address"
-      value={form.address}
-      onChange={handleChange}
-      className="
-        mt-1
-        w-full
-        bg-[#fafafa]
-        border
-        border-gray-200
-        rounded-xl
-        px-3
-        py-2.5
-        outline-none
-        focus:border-[#13273c]
-        text-[10px]
-        resize-none
-      "
-    />
+                <PasswordBox
+                  label="Password"
+                  placeholder="Enter password"
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  showPassword={showPassword}
+                  setShowPassword={
+                    setShowPassword
+                  }
+                />
 
-  </div>
+                <PasswordBox
+                  label="Confirm Password"
+                  placeholder="Confirm password"
+                  name="confirm_password"
+                  value={form.confirm_password}
+                  onChange={handleChange}
+                  showPassword={
+                    showConfirmPassword
+                  }
+                  setShowPassword={
+                    setShowConfirmPassword
+                  }
+                />
 
-  {/* Password */}
-  <PasswordBox
-    label="Password"
-    placeholder="Enter password"
-    name="password"
-    value={form.password}
-    onChange={handleChange}
-    showPassword={showPassword}
-    setShowPassword={setShowPassword}
-  />
+              </div>
 
-  {/* Confirm Password */}
-  <PasswordBox
-    label="Confirm Password"
-    placeholder="Confirm password"
-    name="confirm_password"
-    value={form.confirm_password}
-    onChange={handleChange}
-    showPassword={showConfirmPassword}
-    setShowPassword={setShowConfirmPassword}
-  />
+              {/* ================= BUTTONS ================= */}
 
-</div>
-
-              {/* Buttons */}
-
-              <div className="
-                flex
-                justify-end
-                gap-2
-                pt-5
-              ">
+              <div
+                className="
+                  flex
+                  justify-end
+                  gap-2
+                  pt-5
+                "
+              >
 
                 <button
                   type="button"
@@ -557,6 +792,7 @@ export default function Vendor() {
                     disabled:opacity-60
                   "
                 >
+
                   <CheckCircle size={12} />
 
                   {loading
@@ -564,6 +800,7 @@ export default function Vendor() {
                     : editingId
                     ? "Save Vendor"
                     : "Register Vendor"}
+
                 </button>
 
               </div>
@@ -582,7 +819,6 @@ export default function Vendor() {
   );
 }
 
-
 /* =========================
    INPUT BOX
 ========================= */
@@ -600,26 +836,30 @@ function InputBox({
   return (
     <div>
 
-      <label className="
-        text-[9px]
-        font-semibold
-        text-[#13273c]
-      ">
+      <label
+        className="
+          text-[9px]
+          font-semibold
+          text-[#13273c]
+        "
+      >
         {label}
       </label>
 
-      <div className="
-        mt-1
-        flex
-        items-center
-        bg-[#fafafa]
-        border
-        border-gray-200
-        rounded-xl
-        px-3
-        h-[40px]
-        focus-within:border-[#13273c]
-      ">
+      <div
+        className="
+          mt-1
+          flex
+          items-center
+          bg-[#fafafa]
+          border
+          border-gray-200
+          rounded-xl
+          px-3
+          h-[40px]
+          focus-within:border-[#13273c]
+        "
+      >
 
         <span className="text-gray-400">
           {icon}
@@ -649,7 +889,6 @@ function InputBox({
   );
 }
 
-
 /* =========================
    PASSWORD BOX
 ========================= */
@@ -666,26 +905,30 @@ function PasswordBox({
   return (
     <div>
 
-      <label className="
-        text-[9px]
-        font-semibold
-        text-[#13273c]
-      ">
+      <label
+        className="
+          text-[9px]
+          font-semibold
+          text-[#13273c]
+        "
+      >
         {label}
       </label>
 
-      <div className="
-        mt-1
-        flex
-        items-center
-        bg-[#fafafa]
-        border
-        border-gray-200
-        rounded-xl
-        px-3
-        h-[40px]
-        focus-within:border-[#13273c]
-      ">
+      <div
+        className="
+          mt-1
+          flex
+          items-center
+          bg-[#fafafa]
+          border
+          border-gray-200
+          rounded-xl
+          px-3
+          h-[40px]
+          focus-within:border-[#13273c]
+        "
+      >
 
         <span className="text-gray-400">
           <Lock size={12} />

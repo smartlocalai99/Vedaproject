@@ -444,8 +444,8 @@ bg-[#fafafa]
 border
 border-gray-200
 rounded-xl
-px-4
-py-3
+px-3
+py-2
 outline-none
 focus:border-[#13273c]
 "

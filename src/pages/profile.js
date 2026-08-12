@@ -1,21 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import SuperAdminFooter from "@/components/SuperAdminFooter";
 
 import {
-  CircleUserRound,
   Mail,
   Phone,
   Shield,
   Pencil,
-  Lock,
-  LogOut,
-  ChevronRight,
   Camera,
 } from "lucide-react";
 
 export default function Profile() {
   const router = useRouter();
+
   const [editing, setEditing] = useState(false);
 
   const [profile, setProfile] = useState({
@@ -26,53 +23,181 @@ export default function Profile() {
     image: "",
   });
 
-  /* ---------------- IMAGE UPLOAD ---------------- */
+  /* =========================================================
+     LOAD SAVED PROFILE IMAGE
+  ========================================================= */
+
+  useEffect(() => {
+    const savedImage = localStorage.getItem(
+      "superAdminProfileImage"
+    );
+
+    const savedProfile = localStorage.getItem(
+      "superAdminProfile"
+    );
+
+    if (savedProfile) {
+      try {
+        const parsedProfile = JSON.parse(savedProfile);
+
+        setProfile((current) => ({
+          ...current,
+          ...parsedProfile,
+          image:
+            savedImage ||
+            parsedProfile.image ||
+            "",
+        }));
+      } catch (error) {
+        console.log(
+          "PROFILE LOAD ERROR:",
+          error
+        );
+
+        if (savedImage) {
+          setProfile((current) => ({
+            ...current,
+            image: savedImage,
+          }));
+        }
+      }
+    } else if (savedImage) {
+      setProfile((current) => ({
+        ...current,
+        image: savedImage,
+      }));
+    }
+  }, []);
+
+  /* =========================================================
+     IMAGE UPLOAD
+  ========================================================= */
 
   const handleImage = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
 
-    if (file) {
-      setProfile({
-        ...profile,
-        image: URL.createObjectURL(file),
-      });
+    if (!file) {
+      return;
     }
+
+    /*
+     * Convert image to Base64.
+     *
+     * Unlike URL.createObjectURL(),
+     * Base64 remains available after page reload.
+     */
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const imageData = reader.result;
+
+      setProfile((current) => ({
+        ...current,
+        image: imageData,
+      }));
+
+      /*
+       * Save image permanently in browser storage.
+       */
+
+      localStorage.setItem(
+        "superAdminProfileImage",
+        imageData
+      );
+    };
+
+    reader.onerror = () => {
+      console.log(
+        "PROFILE IMAGE ERROR"
+      );
+    };
+
+    reader.readAsDataURL(file);
   };
 
-  /* ---------------- UPDATE PROFILE ---------------- */
+  /* =========================================================
+     UPDATE PROFILE
+  ========================================================= */
 
-  const updateProfile = (field, value) => {
-    setProfile({
-      ...profile,
+  const updateProfile = (
+    field,
+    value
+  ) => {
+    setProfile((current) => ({
+      ...current,
       [field]: value,
-    });
+    }));
   };
 
-  /* ---------------- EDIT / SAVE ---------------- */
+  /* =========================================================
+     ENTER EDIT MODE
+  ========================================================= */
 
   const handleEdit = () => {
-    if (editing) {
-      // Save logic can be added here
-      console.log("Profile Saved:", profile);
-    }
-
-    setEditing(!editing);
+    setEditing(true);
   };
 
-  /* ---------------- LOGOUT ---------------- */
+  /* =========================================================
+     SAVE CHANGES
+  ========================================================= */
+
+  const handleSave = () => {
+    /*
+     * Save complete profile locally.
+     */
+
+    localStorage.setItem(
+      "superAdminProfile",
+      JSON.stringify(profile)
+    );
+
+    /*
+     * Save image separately as well.
+     * This makes sure the image is available
+     * even after logout/login.
+     */
+
+    if (profile.image) {
+      localStorage.setItem(
+        "superAdminProfileImage",
+        profile.image
+      );
+    }
+
+    console.log(
+      "Profile Saved:",
+      profile
+    );
+
+    setEditing(false);
+  };
+
+  /* =========================================================
+     LOGOUT
+  ========================================================= */
 
   const handleLogout = () => {
-    localStorage.removeItem("superAdminProfile");
+    /*
+     * IMPORTANT:
+     *
+     * Do NOT remove:
+     * superAdminProfile
+     * superAdminProfileImage
+     *
+     * Otherwise the profile image will disappear
+     * after login again.
+     */
 
     router.push("/");
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F6F8]">
+    <div className="min-h-screen bg-[#F7F7F7]">
 
       {/* ================= MAIN CONTENT ================= */}
 
-      <div className="px-4 py-5 pb-28">
+      <div className="px-4 py-5 pb-32">
 
         {/* Page Title */}
 
@@ -82,27 +207,23 @@ export default function Profile() {
 
         {/* ================= PROFILE CARD ================= */}
 
-        <div className="bg-white rounded-3xl p-4 mt-2  relative">
+        <div className="bg-white rounded-3xl p-4 mt-2 relative">
 
-          {/* Edit / Save Button */}
+          {/* TOP RIGHT PENCIL */}
 
-          <button
-            onClick={handleEdit}
-            className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-[#F8F5EF] flex items-center justify-center hover:bg-[#eee8dc] transition"
-          >
-            {editing ? (
-              <span className="text-xs font-semibold text-[#B67A43]">
-                Save
-              </span>
-            ) : (
+          {!editing && (
+            <button
+              onClick={handleEdit}
+              className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-[#F8F5EF] flex items-center justify-center hover:bg-[#eee8dc] transition"
+            >
               <Pencil
                 size={17}
                 className="text-[#0F1F35]"
               />
-            )}
-          </button>
+            </button>
+          )}
 
-          {/* Profile Content */}
+          {/* PROFILE CONTENT */}
 
           <div className="flex items-center gap-4">
 
@@ -111,22 +232,33 @@ export default function Profile() {
             <div className="relative shrink-0">
 
               {profile.image ? (
+
                 /* eslint-disable-next-line @next/next/no-img-element */
+
                 <img
                   src={profile.image}
                   alt="Profile"
-                  className="w-15 h-15 rounded-full object-cover border-4 border-[#0F1F35]"
+                  className="w-[70px] h-[70px] rounded-full object-cover border-2 border-white"
                 />
+
               ) : (
-                <div className="w-15 h-15 rounded-full bg-[#0F1F35] flex items-center justify-center">
-                  <CircleUserRound
-                    size={35}
-                    className="text-white"
-                  />
+
+                <div className="w-[70px] h-[70px] rounded-full bg-[#0F1F35] flex items-center justify-center">
+
+                  <span className="text-[34px] font-bold text-white">
+
+                    {profile.name
+                      ? profile.name
+                          .charAt(0)
+                          .toUpperCase()
+                      : "S"}
+
+                  </span>
+
                 </div>
               )}
 
-              {/* Camera Button */}
+              {/* CAMERA */}
 
               {editing && (
                 <>
@@ -154,17 +286,23 @@ export default function Profile() {
 
             {/* ================= NAME + ROLE ================= */}
 
-            <div className="flex-1 pr-10">
+            <div className="flex-1 min-w-0">
 
               {editing ? (
+
                 <input
                   value={profile.name}
                   onChange={(e) =>
-                    updateProfile("name", e.target.value)
+                    updateProfile(
+                      "name",
+                      e.target.value
+                    )
                   }
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-base font-bold text-[#0F1F35] outline-none focus:ring-2 focus:ring-[#B67A43]"
                 />
+
               ) : (
+
                 <h3 className="text-lg font-bold text-[#0F1F35] truncate">
                   {profile.name}
                 </h3>
@@ -182,35 +320,43 @@ export default function Profile() {
 
         {/* ================= PROFILE DETAILS ================= */}
 
-        <div className="bg-white rounded-3xl shadow-sm mt-1 p-5 space-y-6">
+        <div className="bg-white rounded-3xl shadow-sm mt-3 p-5 space-y-6">
 
           {/* ================= EMAIL ================= */}
 
           <div className="flex items-start gap-4">
 
-            <div className="w-10 h-10 rounded-xl bg-[#F8F5EF]  flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-[#F8F5EF] flex items-center justify-center shrink-0">
+
               <Mail
                 size={20}
                 className="text-[#0F1F35]"
               />
+
             </div>
 
-            <div className="flex-1 ">
+            <div className="flex-1">
 
               <p className="text-xs text-gray-500 mb-1">
                 Email
               </p>
 
               {editing ? (
+
                 <input
                   type="email"
                   value={profile.email}
                   onChange={(e) =>
-                    updateProfile("email", e.target.value)
+                    updateProfile(
+                      "email",
+                      e.target.value
+                    )
                   }
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#B67A43]"
                 />
+
               ) : (
+
                 <p className="font-semibold text-sm text-[#0F1F35] break-all">
                   {profile.email}
                 </p>
@@ -225,10 +371,12 @@ export default function Profile() {
           <div className="flex items-start gap-4">
 
             <div className="w-10 h-10 rounded-xl bg-[#F8F5EF] flex items-center justify-center shrink-0">
+
               <Phone
                 size={20}
                 className="text-[#0F1F35]"
               />
+
             </div>
 
             <div className="flex-1">
@@ -238,15 +386,21 @@ export default function Profile() {
               </p>
 
               {editing ? (
+
                 <input
                   type="text"
                   value={profile.phone}
                   onChange={(e) =>
-                    updateProfile("phone", e.target.value)
+                    updateProfile(
+                      "phone",
+                      e.target.value
+                    )
                   }
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#B67A43]"
                 />
+
               ) : (
+
                 <p className="font-semibold text-sm text-[#0F1F35]">
                   +91 {profile.phone}
                 </p>
@@ -261,10 +415,12 @@ export default function Profile() {
           <div className="flex items-start gap-4">
 
             <div className="w-10 h-10 rounded-xl bg-[#F8F5EF] flex items-center justify-center shrink-0">
+
               <Shield
                 size={20}
                 className="text-[#0F1F35]"
               />
+
             </div>
 
             <div>
@@ -283,6 +439,16 @@ export default function Profile() {
 
         </div>
 
+        {/* ================= SAVE CHANGES ================= */}
+
+        {editing && (
+          <button
+            onClick={handleSave}
+            className="w-full mt-6 h-14 rounded-2xl bg-[#B67A43] text-white text-[17px] font-bold hover:bg-[#9F6939] transition"
+          >
+            Save Changes
+          </button>
+        )}
 
       </div>
 

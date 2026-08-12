@@ -4,6 +4,16 @@ import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
 import { Users, Store, Plus } from "lucide-react";
 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+
 export default function Dashboard() {
   const router = useRouter();
 
@@ -14,8 +24,32 @@ export default function Dashboard() {
 
   const [name, setName] = useState("Sales Executive");
 
+  const [vendorFilter, setVendorFilter] =
+    useState("overall");
+
+  const [memberFilter, setMemberFilter] =
+    useState("overall");
+
+  const [vendorPerformance, setVendorPerformance] =
+    useState([]);
+
+  const [memberPerformance, setMemberPerformance] =
+    useState([]);
+
+  const [loadingVendorPerformance, setLoadingVendorPerformance] =
+    useState(true);
+
+  const [loadingMemberPerformance, setLoadingMemberPerformance] =
+    useState(true);
+
+  /* =====================================================
+     LOAD BASIC STATS
+     ===================================================== */
+
   useEffect(() => {
-    const saved = localStorage.getItem("salesExecutiveSession");
+    const saved = localStorage.getItem(
+      "salesExecutiveSession"
+    );
 
     if (!saved) {
       router.replace("/salesexecutive/login");
@@ -24,106 +58,605 @@ export default function Dashboard() {
 
     const session = JSON.parse(saved);
 
-    setName(session.full_name || "Sales Executive");
+    setName(
+      session.full_name || "Sales Executive"
+    );
 
     async function loadStats() {
-      const [vendors, members] = await Promise.all([
-        supabase
-          .from("vendors")
-          .select("id", { count: "exact", head: true })
-          .eq("sales_id", session.id),
+      try {
+        const [vendorsResult, membersResult] =
+          await Promise.all([
+            /* TOTAL VENDORS */
 
-        supabase
-          .from("members")
-          .select("id", { count: "exact", head: true })
-          .eq("sales_id", session.id),
-      ]);
+            supabase
+              .from("vendors")
+              .select("id", {
+                count: "exact",
+                head: true,
+              })
+              .eq("sales_id", session.id),
 
-      setStatsData({
-        vendors: vendors.count || 0,
-        members: members.count || 0,
-      });
+            /* TOTAL MEMBERS */
+
+            supabase
+              .from("members")
+              .select("id", {
+                count: "exact",
+                head: true,
+              })
+              .eq("sales_id", session.id),
+          ]);
+
+        if (vendorsResult.error) {
+          console.error(
+            "TOTAL VENDORS ERROR:",
+            vendorsResult.error
+          );
+        }
+
+        if (membersResult.error) {
+          console.error(
+            "TOTAL MEMBERS ERROR:",
+            membersResult.error
+          );
+        }
+
+        console.log(
+          "TOTAL VENDORS:",
+          vendorsResult.count
+        );
+
+        console.log(
+          "TOTAL MEMBERS:",
+          membersResult.count
+        );
+
+        setStatsData({
+          vendors: vendorsResult.count || 0,
+          members: membersResult.count || 0,
+        });
+      } catch (error) {
+        console.error(
+          "STATS ERROR:",
+          error
+        );
+      }
     }
 
     loadStats();
   }, [router]);
 
+  /* =====================================================
+     VENDOR PERFORMANCE
+     ===================================================== */
+
+  useEffect(() => {
+    async function loadVendorPerformance() {
+      const saved = localStorage.getItem(
+        "salesExecutiveSession"
+      );
+
+      if (!saved) {
+        return;
+      }
+
+      const session = JSON.parse(saved);
+
+      try {
+        setLoadingVendorPerformance(true);
+
+        const {
+          data: vendorsData,
+          error: vendorError,
+        } = await supabase
+          .from("vendors")
+          .select(
+            "id, business_name"
+          )
+          .eq(
+            "sales_id",
+            session.id
+          )
+          .order(
+            "business_name",
+            {
+              ascending: true,
+            }
+          );
+
+        if (vendorError) {
+          console.error(
+            "VENDOR PERFORMANCE VENDOR ERROR:",
+            vendorError
+          );
+
+          setVendorPerformance([]);
+          return;
+        }
+
+        const vendorIds =
+          (vendorsData || []).map(
+            (vendor) => vendor.id
+          );
+
+        if (vendorIds.length === 0) {
+          setVendorPerformance([]);
+          return;
+        }
+
+        let query = supabase
+          .from("transactions")
+          .select(
+            "vendor_id, created_at"
+          )
+          .in(
+            "vendor_id",
+            vendorIds
+          );
+
+        /* MONTH FILTER */
+
+        if (
+          vendorFilter ===
+          "month"
+        ) {
+          const now =
+            new Date();
+
+          const start =
+            new Date(
+              now.getFullYear(),
+              now.getMonth(),
+              1
+            );
+
+          const end =
+            new Date(
+              now.getFullYear(),
+              now.getMonth() + 1,
+              1
+            );
+
+          query = query
+            .gte(
+              "created_at",
+              start.toISOString()
+            )
+            .lt(
+              "created_at",
+              end.toISOString()
+            );
+        }
+
+        const {
+          data: transactions,
+          error:
+            transactionError,
+        } = await query;
+
+        if (transactionError) {
+          console.error(
+            "VENDOR PERFORMANCE TRANSACTION ERROR:",
+            transactionError
+          );
+
+          setVendorPerformance([]);
+          return;
+        }
+
+        const result =
+          (vendorsData || [])
+            .map((vendor) => {
+              const count =
+                (
+                  transactions || []
+                ).filter(
+                  (transaction) =>
+                    transaction.vendor_id ===
+                    vendor.id
+                ).length;
+
+              return {
+                name:
+                  vendor.business_name ||
+                  "Vendor",
+                transactions:
+                  count,
+              };
+            })
+            .sort(
+              (a, b) =>
+                b.transactions -
+                a.transactions
+            );
+
+        setVendorPerformance(
+          result
+        );
+      } catch (error) {
+        console.error(
+          "VENDOR PERFORMANCE ERROR:",
+          error
+        );
+
+        setVendorPerformance([]);
+      } finally {
+        setLoadingVendorPerformance(
+          false
+        );
+      }
+    }
+
+    loadVendorPerformance();
+  }, [vendorFilter]);
+
+  /* =====================================================
+     MEMBER PERFORMANCE
+     ===================================================== */
+
+  useEffect(() => {
+    async function loadMemberPerformance() {
+      const saved = localStorage.getItem(
+        "salesExecutiveSession"
+      );
+
+      if (!saved) {
+        return;
+      }
+
+      const session = JSON.parse(saved);
+
+      try {
+        setLoadingMemberPerformance(
+          true
+        );
+
+        const {
+          data,
+          error,
+        } = await supabase
+          .from("members")
+          .select(
+            "id, created_at"
+          )
+          .eq(
+            "sales_id",
+            session.id
+          )
+          .order(
+            "created_at",
+            {
+              ascending: true,
+            }
+          );
+
+        if (error) {
+          console.error(
+            "MEMBER PERFORMANCE ERROR:",
+            error
+          );
+
+          setMemberPerformance([]);
+          return;
+        }
+
+        /* =================================================
+           CURRENT MONTH
+           ================================================= */
+
+        if (
+          memberFilter ===
+          "month"
+        ) {
+          const now =
+            new Date();
+
+          const start =
+            new Date(
+              now.getFullYear(),
+              now.getMonth(),
+              1
+            );
+
+          const end =
+            new Date(
+              now.getFullYear(),
+              now.getMonth() + 1,
+              1
+            );
+
+          const filtered =
+            (
+              data || []
+            ).filter(
+              (member) => {
+                const date =
+                  new Date(
+                    member.created_at
+                  );
+
+                return (
+                  date >=
+                    start &&
+                  date < end
+                );
+              }
+            );
+
+          const daysInMonth =
+            new Date(
+              now.getFullYear(),
+              now.getMonth() + 1,
+              0
+            ).getDate();
+
+          const days =
+            Array.from(
+              {
+                length:
+                  daysInMonth,
+              },
+              (_, index) => ({
+                name: String(
+                  index + 1
+                ),
+                members: 0,
+              })
+            );
+
+          filtered.forEach(
+            (member) => {
+              const day =
+                new Date(
+                  member.created_at
+                ).getDate();
+
+              if (
+                days[day - 1]
+              ) {
+                days[
+                  day - 1
+                ].members += 1;
+              }
+            }
+          );
+
+          setMemberPerformance(
+            days
+          );
+
+          return;
+        }
+
+        /* =================================================
+           OVERALL - LAST 6 MONTHS
+           ================================================= */
+
+        const now =
+          new Date();
+
+        const months = [];
+
+        for (
+          let i = 5;
+          i >= 0;
+          i--
+        ) {
+          const date =
+            new Date(
+              now.getFullYear(),
+              now.getMonth() - i,
+              1
+            );
+
+          months.push({
+            name:
+              date.toLocaleString(
+                "en-IN",
+                {
+                  month:
+                    "short",
+                }
+              ),
+            year:
+              date.getFullYear(),
+            monthIndex:
+              date.getMonth(),
+            members: 0,
+          });
+        }
+
+        (
+          data || []
+        ).forEach(
+          (member) => {
+            const date =
+              new Date(
+                member.created_at
+              );
+
+            const matching =
+              months.find(
+                (item) =>
+                  item.year ===
+                    date.getFullYear() &&
+                  item.monthIndex ===
+                    date.getMonth()
+              );
+
+            if (matching) {
+              matching.members += 1;
+            }
+          }
+        );
+
+        setMemberPerformance(
+          months.map(
+            (item) => ({
+              name:
+                item.name,
+              members:
+                item.members,
+            })
+          )
+        );
+      } catch (error) {
+        console.error(
+          "MEMBER PERFORMANCE ERROR:",
+          error
+        );
+
+        setMemberPerformance([]);
+      } finally {
+        setLoadingMemberPerformance(
+          false
+        );
+      }
+    }
+
+    loadMemberPerformance();
+  }, [memberFilter]);
+
+  /* =====================================================
+     STATS CARDS
+     ===================================================== */
+
   const stats = [
     {
-      title: "Total Vendors Added",
-      value: String(statsData.vendors).padStart(2, "0"),
-      subtitle: "Today",
+      title: "Total Vendors",
+      value: statsData.vendors,
       icon: Store,
       iconColor: "text-orange-600",
+      iconBg: "bg-orange-50",
     },
     {
-      title: "Total Members Added",
-      value: String(statsData.members).padStart(2, "0"),
-      subtitle: "Today",
+      title: "Total Members",
+      value: statsData.members,
       icon: Users,
       iconColor: "text-blue-600",
+      iconBg: "bg-blue-50",
     },
   ];
 
+  /* =====================================================
+     PAGE
+     ===================================================== */
+
   return (
-    <div className="min-h-screen bg-[#F8F4EE] pb-20">
-      <header className=" font-bold text-lg text-white bg-[#111827] px-5 py-4 flex justify-between items-center">
-        <div>
-        <h1>
-        Welcome {name}  
-        </h1>
-      
+    <div className="min-h-screen bg-[#F5F7FA]">
+
+      {/* HEADER */}
+
+      <header className="bg-[#111827] px-4 py-4">
+        <div className="text-sm font-bold text-white">
+          Welcome {name}
         </div>
       </header>
 
-      
+      {/* MAIN */}
 
-      <div className="p-4">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="p-4 -mt-1 pb-24">
+
+        {/* =================================================
+            STATS CARDS
+            ================================================= */}
+
+        <div className="grid grid-cols-2 gap-2">
+
           {stats.map((item) => {
-            const Icon = item.icon;
+            const Icon =
+              item.icon;
 
             return (
               <div
                 key={item.title}
-                className="bg-white rounded-m p-2"
+                className="
+                  bg-white
+                  rounded-lg
+                  border
+                  border-gray-200
+                  shadow-sm
+                  px-3
+                  py-3
+                "
               >
-                <div className="flex items-center gap-3">
-                  <div>
+                <div className="flex items-center gap-2.5">
+
+                  {/* ICON */}
+
+                  <div
+                    className={`
+                      w-8
+                      h-8
+                      rounded-full
+                      ${item.iconBg}
+                      flex
+                      items-center
+                      justify-center
+                      flex-shrink-0
+                    `}
+                  >
                     <Icon
-                      size={20}
-                      className={item.iconColor}
+                      size={16}
+                      className={
+                        item.iconColor
+                      }
                     />
                   </div>
 
-                  <div>
-                    <p className="text-xs text-gray-500">
+                  {/* TEXT */}
+
+                  <div className="min-w-0">
+
+                    <p className="text-[11px] text-gray-500 leading-tight">
                       {item.title}
                     </p>
 
-                    <h2 className="text-xs font-bold">
+                    <h2 className="text-sm font-bold text-[#172033] mt-1">
                       {item.value}
                     </h2>
 
-                    <p className="text-[9px] text-gray-400">
-                      {item.subtitle}
-                    </p>
                   </div>
                 </div>
               </div>
             );
           })}
+
         </div>
 
-        <div className="mt-5 space-y-4">
+        {/* =================================================
+            QUICK ACTIONS
+            ================================================= */}
+
+        <div className="mt-2 space-y-4">
+
+          {/* ADD VENDOR */}
+
           <div
             onClick={() =>
-              router.push("/salesexecutive/vendors")
+              router.push(
+                "/salesexecutive/vendors"
+              )
             }
-            className="bg-[#172033] rounded-xl p-5 text-white cursor-pointer"
+            className="
+              bg-[#172033]
+              rounded-xl
+              p-5
+              text-white
+              cursor-pointer
+            "
           >
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+            <div className="-mt-1 flex items-center gap-4">
+
+              <div className="
+                w-8
+                h-8
+                rounded-full
+                bg-white/10
+                flex
+                items-center
+                justify-center
+              ">
                 <Plus size={22} />
               </div>
 
@@ -136,17 +669,37 @@ export default function Dashboard() {
                   Register new vendor
                 </p>
               </div>
+
             </div>
           </div>
 
+          {/* ADD MEMBER */}
+
           <div
             onClick={() =>
-              router.push("/salesexecutive/members")
+              router.push(
+                "/salesexecutive/members"
+              )
             }
-            className="bg-[#B97943] rounded-xl p-5 text-white cursor-pointer"
+            className="
+              bg-[#B97943]
+              rounded-xl
+              p-5
+              text-white
+              cursor-pointer
+            "
           >
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+            <div className="-mt-1 flex items-center gap-4">
+
+              <div className="
+                w-8
+                h-8
+                rounded-full
+                bg-white/10
+                flex
+                items-center
+                justify-center
+              ">
                 <Plus size={26} />
               </div>
 
@@ -159,12 +712,448 @@ export default function Dashboard() {
                   Register new member
                 </p>
               </div>
+
             </div>
           </div>
+
         </div>
+
+        {/* =================================================
+            VENDOR PERFORMANCE
+            ================================================= */}
+
+        <div className="
+          mt-5
+          rounded-2xl
+          border
+          border-[#E9E2DC]
+          bg-white
+          p-3
+        ">
+
+          <div className="flex items-center justify-between">
+
+            <div>
+              <h3 className="text-[15px] font-bold text-[#16120e]">
+                Vendor Performance
+              </h3>
+
+              <p className="mt-1 text-[10px] text-[#8A7D72]">
+                Transactions by vendor
+              </p>
+            </div>
+
+          </div>
+
+          {/* FILTER */}
+
+          <div className="
+            mt-3
+            flex
+            h-9
+            rounded-lg
+            bg-[#F5F1ED]
+            p-1
+          ">
+
+            <button
+              onClick={() =>
+                setVendorFilter(
+                  "month"
+                )
+              }
+              className={`
+                flex-1
+                rounded-md
+                text-[11px]
+                font-semibold
+                ${
+                  vendorFilter ===
+                  "month"
+                    ? "bg-[#B97943] text-white"
+                    : "text-[#756B63]"
+                }
+              `}
+            >
+              Month
+            </button>
+
+            <button
+              onClick={() =>
+                setVendorFilter(
+                  "overall"
+                )
+              }
+              className={`
+                flex-1
+                rounded-md
+                text-[11px]
+                font-semibold
+                ${
+                  vendorFilter ===
+                  "overall"
+                    ? "bg-[#B97943] text-white"
+                    : "text-[#756B63]"
+                }
+              `}
+            >
+              Overall
+            </button>
+
+          </div>
+
+          {/* VENDOR GRAPH */}
+
+          <div
+            className="mt-3 w-full"
+            style={{
+              height: Math.max(
+                220,
+                vendorPerformance.length *
+                  40
+              ),
+            }}
+          >
+
+            {loadingVendorPerformance ? (
+
+              <div className="
+                flex
+                h-full
+                items-center
+                justify-center
+              ">
+                <p className="text-[10px] text-[#8A7D72]">
+                  Loading...
+                </p>
+              </div>
+
+            ) : vendorPerformance.length ===
+              0 ? (
+
+              <div className="
+                flex
+                h-full
+                items-center
+                justify-center
+              ">
+                <p className="text-[10px] text-[#8A7D72]">
+                  No vendor data available
+                </p>
+              </div>
+
+            ) : (
+
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+
+                <BarChart
+                  data={
+                    vendorPerformance
+                  }
+                  layout="vertical"
+                  margin={{
+                    top: 5,
+                    right: 10,
+                    left: 5,
+                    bottom: 5,
+                  }}
+                  barCategoryGap="8%"
+                >
+
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#EEE8E2"
+                    horizontal={false}
+                  />
+
+                  <XAxis
+                    type="number"
+                    domain={[
+                      0,
+                      1000,
+                    ]}
+                    ticks={[
+                      0,
+                      200,
+                      400,
+                      600,
+                      800,
+                      1000,
+                    ]}
+                    allowDecimals={
+                      false
+                    }
+                    tick={{
+                      fontSize: 8,
+                      fill: "#8A7D72",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={80}
+                    interval={0}
+                    tick={{
+                      fontSize: 8,
+                      fill: "#16120e",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+
+                  <Tooltip />
+
+                  <Bar
+                    dataKey="transactions"
+                    fill="#172033"
+                    radius={[
+                      0,
+                      5,
+                      5,
+                      0,
+                    ]}
+                    barSize={16}
+                  />
+
+                </BarChart>
+
+              </ResponsiveContainer>
+
+            )}
+
+          </div>
+
+        </div>
+
+        {/* =================================================
+            MEMBER PERFORMANCE
+            ================================================= */}
+
+        <div className="
+          mt-5
+          rounded-2xl
+          border
+          border-[#E9E2DC]
+          bg-white
+          p-3
+        ">
+
+          <div>
+            <h3 className="text-[15px] font-bold text-[#16120e]">
+              Member Performance
+            </h3>
+
+            <p className="mt-1 text-[10px] text-[#8A7D72]">
+              Members onboarded
+            </p>
+          </div>
+
+          {/* FILTER */}
+
+          <div className="
+            mt-3
+            flex
+            h-9
+            rounded-lg
+            bg-[#F5F1ED]
+            p-1
+          ">
+
+            <button
+              onClick={() =>
+                setMemberFilter(
+                  "month"
+                )
+              }
+              className={`
+                flex-1
+                rounded-md
+                text-[11px]
+                font-semibold
+                ${
+                  memberFilter ===
+                  "month"
+                    ? "bg-[#B97943] text-white"
+                    : "text-[#756B63]"
+                }
+              `}
+            >
+              Month
+            </button>
+
+            <button
+              onClick={() =>
+                setMemberFilter(
+                  "overall"
+                )
+              }
+              className={`
+                flex-1
+                rounded-md
+                text-[11px]
+                font-semibold
+                ${
+                  memberFilter ===
+                  "overall"
+                    ? "bg-[#B97943] text-white"
+                    : "text-[#756B63]"
+                }
+              `}
+            >
+              Overall
+            </button>
+
+          </div>
+
+          {/* MEMBER GRAPH */}
+
+          <div
+            className="mt-4 w-full"
+            style={{
+              height: 280,
+            }}
+          >
+
+            {loadingMemberPerformance ? (
+
+              <div className="
+                flex
+                h-full
+                items-center
+                justify-center
+              ">
+                <p className="text-[10px] text-[#8A7D72]">
+                  Loading...
+                </p>
+              </div>
+
+            ) : memberPerformance.length ===
+              0 ? (
+
+              <div className="
+                flex
+                h-full
+                items-center
+                justify-center
+              ">
+                <p className="text-[10px] text-[#8A7D72]">
+                  No member data available
+                </p>
+              </div>
+
+            ) : (
+
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+
+                <BarChart
+                  data={
+                    memberPerformance
+                  }
+                  margin={{
+                    top: 10,
+                    right: 10,
+                    left: 0,
+                    bottom: 5,
+                  }}
+                  barCategoryGap="20%"
+                >
+
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#EEE8E2"
+                    vertical={false}
+                  />
+
+                  <XAxis
+                    dataKey="name"
+                    interval={
+                      memberFilter ===
+                      "month"
+                        ? 1
+                        : 0
+                    }
+                    tick={{
+                      fontSize: 8,
+                      fill: "#8A7D72",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+
+                  <YAxis
+                    type="number"
+                    domain={[
+                      0,
+                      500,
+                    ]}
+                    ticks={[
+                      0,
+                      50,
+                      100,
+                      150,
+                      200,
+                      250,
+                      300,
+                      350,
+                      400,
+                      450,
+                      500,
+                    ]}
+                    allowDecimals={
+                      false
+                    }
+                    tick={{
+                      fontSize: 8,
+                      fill: "#8A7D72",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+
+                  <Tooltip />
+
+                  <Bar
+                    dataKey="members"
+                    fill="#172033"
+                    radius={[
+                      5,
+                      5,
+                      0,
+                      0,
+                    ]}
+                    barSize={
+                      memberFilter ===
+                      "month"
+                        ? 10
+                        : 28
+                    }
+                  />
+
+                </BarChart>
+
+              </ResponsiveContainer>
+
+            )}
+
+          </div>
+
+        </div>
+
       </div>
 
+      {/* FOOTER */}
+
       <Footer />
+
     </div>
   );
 }

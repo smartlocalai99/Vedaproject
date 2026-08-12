@@ -11,10 +11,11 @@ import {
   showSuccess,
 } from "@/lib/alerts";
 
+import Swal from "sweetalert2";
+
 import {
   ArrowLeft,
   Plus,
-  Pencil,
   Search,
   UserRound,
   Phone,
@@ -24,6 +25,12 @@ import {
   ChevronDown,
   ChevronUp,
   BadgeCheck,
+  Eye,
+  EyeOff,
+  Store,
+  Users,
+  ReceiptText,
+  IndianRupee,
 } from "lucide-react";
 
 export default function Sales() {
@@ -40,6 +47,18 @@ export default function Sales() {
 
   const [expanded, setExpanded] = useState(null);
 
+  // Selected sales executive details
+  const [selectedSales, setSelectedSales] = useState(null);
+
+  const [salesStats, setSalesStats] = useState({
+    vendors: 0,
+    members: 0,
+    transactions: 0,
+    benefits: 0,
+  });
+
+  const [statsLoading, setStatsLoading] = useState(false);
+
   /* =========================================================
      LOAD SALES
   ========================================================= */
@@ -47,10 +66,7 @@ export default function Sales() {
   const loadSales = async () => {
     setLoading(true);
 
-    const {
-      data,
-      error: loadError,
-    } = await supabase
+    const { data, error: loadError } = await supabase
       .from("sales_executives")
       .select("*")
       .order("created_at", {
@@ -72,6 +88,128 @@ export default function Sales() {
   }, []);
 
   /* =========================================================
+     LOAD SALES EXECUTIVE DETAILS
+  ========================================================= */
+
+  const openSalesDetails = async (item) => {
+    setSelectedSales(item);
+    setStatsLoading(true);
+
+    try {
+      /*
+       * VENDORS
+       *
+       * Assumes vendors.sales_id points to
+       * sales_executives.id.
+       */
+      const vendorsQuery = await supabase
+        .from("vendors")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("sales_id", item.id);
+
+      /*
+       * MEMBERS
+       *
+       * Assumes members.sales_id points to
+       * sales_executives.id.
+       */
+      const membersQuery = await supabase
+        .from("members")
+        .select("id", {
+          count: "exact",
+          head: true,
+        })
+        .eq("sales_id", item.id);
+
+      /*
+       * GET VENDORS ASSIGNED TO THIS SALES EXECUTIVE
+       *
+       * Transactions are connected through vendor_id.
+       */
+      const vendorListQuery = await supabase
+        .from("vendors")
+        .select("id")
+        .eq("sales_id", item.id);
+
+      let transactionCount = 0;
+      let benefitTotal = 0;
+
+      if (
+        !vendorListQuery.error &&
+        vendorListQuery.data &&
+        vendorListQuery.data.length > 0
+      ) {
+        const vendorIds = vendorListQuery.data.map(
+          (vendor) => vendor.id
+        );
+
+        const transactionQuery = await supabase
+          .from("transactions")
+          .select("id, benefit_amount")
+          .in("vendor_id", vendorIds);
+
+        if (!transactionQuery.error) {
+          transactionCount =
+            transactionQuery.data?.length || 0;
+
+          benefitTotal = (
+            transactionQuery.data || []
+          ).reduce(
+            (total, transaction) =>
+              total +
+              Number(
+                transaction.benefit_amount || 0
+              ),
+            0
+          );
+        }
+      }
+
+      setSalesStats({
+        vendors: vendorsQuery.count || 0,
+
+        members: membersQuery.count || 0,
+
+        transactions: transactionCount,
+
+        benefits: benefitTotal,
+      });
+    } catch (err) {
+      console.log(
+        "SALES DETAILS ERROR:",
+        err
+      );
+
+      setSalesStats({
+        vendors: 0,
+        members: 0,
+        transactions: 0,
+        benefits: 0,
+      });
+    }
+
+    setStatsLoading(false);
+  };
+
+  /* =========================================================
+     CLOSE DETAILS
+  ========================================================= */
+
+  const closeSalesDetails = () => {
+    setSelectedSales(null);
+
+    setSalesStats({
+      vendors: 0,
+      members: 0,
+      transactions: 0,
+      benefits: 0,
+    });
+  };
+
+  /* =========================================================
      DELETE SALES
   ========================================================= */
 
@@ -83,12 +221,11 @@ export default function Sales() {
 
     if (!confirmation.isConfirmed) return;
 
-    const {
-      error: deleteError,
-    } = await supabase
-      .from("sales_executives")
-      .delete()
-      .eq("id", id);
+    const { error: deleteError } =
+      await supabase
+        .from("sales_executives")
+        .delete()
+        .eq("id", id);
 
     if (deleteError) {
       setError(deleteError.message);
@@ -106,6 +243,8 @@ export default function Sales() {
       );
 
       setExpanded(null);
+      setSelectedSales(null);
+
       loadSales();
     }
   };
@@ -114,10 +253,14 @@ export default function Sales() {
      SEARCH
   ========================================================= */
 
-  const filteredSales = sales.filter((item) =>
-    item.full_name
-      ?.toLowerCase()
-      .includes(search.toLowerCase())
+  const filteredSales = sales.filter(
+    (item) =>
+      item.full_name
+        ?.toLowerCase()
+        .includes(search.toLowerCase()) ||
+      item.employee_id
+        ?.toLowerCase()
+        .includes(search.toLowerCase())
   );
 
   /* =========================================================
@@ -139,37 +282,176 @@ export default function Sales() {
   };
 
   /* =========================================================
-     OPEN EDIT FORM
+     SALES EXECUTIVE DETAILS VIEW
   ========================================================= */
 
-  const openEdit = (item) => {
-    setEditing(item);
-    setCreate(true);
+  if (selectedSales) {
+    return (
+      <div className="min-h-screen bg-[#F8F4EE] pb-20">
 
-    setTimeout(() => {
-      document
-        .getElementById("create-sales-form")
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-    }, 0);
-  };
+        {/* HEADER */}
+
+        <div className="flex items-center px-5 pt-5">
+
+          <button
+            type="button"
+            onClick={closeSalesDetails}
+            className="
+              w-7
+              h-7
+              rounded
+              flex
+              items-center
+              justify-center
+              bg-[#F8F4EE]
+            "
+          >
+            <ArrowLeft size={18} />
+          </button>
+
+          <div className="ml-3">
+            <h1 className="text-lg font-bold text-[#172033]">
+              Sales Executive
+            </h1>
+
+            <p className="text-xs text-gray-500">
+              Executive Details
+            </p>
+          </div>
+
+        </div>
+
+        {/* PROFILE */}
+
+        <div className="mx-5 mt-5 bg-white rounded-xl p-5 shadow-sm">
+
+          <div className="flex items-center">
+
+            <div
+              className="
+                w-16
+                h-16
+                rounded-full
+                bg-[#172033]
+                text-white
+                flex
+                items-center
+                justify-center
+                text-lg
+                font-bold
+              "
+            >
+              {selectedSales.full_name
+                ?.charAt(0)
+                ?.toUpperCase() || "S"}
+            </div>
+
+            <div className="ml-4">
+
+              <h2 className="text-lg font-bold text-[#172033]">
+                {selectedSales.full_name ||
+                  "Sales Executive"}
+              </h2>
+
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedSales.employee_id ||
+                  "-"}
+              </p>
+
+            </div>
+
+          </div>
+
+          {/* BASIC DETAILS */}
+
+          <div className="mt-5 space-y-3">
+
+            <DetailRow
+              icon={<Phone size={15} />}
+              label="Mobile"
+              value={
+                selectedSales.mobile_number ||
+                "-"
+              }
+            />
+
+            <DetailRow
+              icon={<Mail size={15} />}
+              label="Email"
+              value={
+                selectedSales.email ||
+                "-"
+              }
+            />
+
+            <DetailRow
+              icon={<MapPin size={15} />}
+              label="Assigned Area"
+              value={
+                selectedSales.assigned_area ||
+                "-"
+              }
+            />
+
+
+          </div>
+
+        </div>
+
+        {/* STATISTICS */}
+
+        <div className="mx-5 mt-4">
+
+          <h2 className="text-sm font-bold text-[#172033] mb-2">
+            Activity Summary
+          </h2>
+
+          <div className="space-y-2">
+
+            <SalesStat
+              icon={<Store size={18} />}
+              title="Vendors Assigned"
+              value={
+                statsLoading
+                  ? "..."
+                  : salesStats.vendors
+              }
+            />
+
+            <SalesStat
+              icon={<Users size={18} />}
+              title="Members Registered"
+              value={
+                statsLoading
+                  ? "..."
+                  : salesStats.members
+              }
+            />
+
+
+          </div>
+
+        </div>
+
+        <SuperAdminFooter />
+
+      </div>
+    );
+  }
 
   /* =========================================================
-     RETURN
+     MAIN SALES LIST
   ========================================================= */
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] pb-24">
+    <div className="min-h-screen bg-[#F8F4EE] pb-20">
 
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
+      {/* HEADER */}
 
       <div className="flex items-center justify-between px-5 pt-5">
 
         <button
+          type="button"
           onClick={() => router.push("/")}
           className="
             w-7
@@ -178,7 +460,7 @@ export default function Sales() {
             flex
             items-center
             justify-center
-            hover:bg-gray-200
+            bg-[#F8F4EE]
           "
         >
           <ArrowLeft size={18} />
@@ -197,8 +479,8 @@ export default function Sales() {
         </div>
 
         <button
-          onClick={openCreate}
           type="button"
+          onClick={openCreate}
           className="
             bg-[#172033]
             text-white
@@ -217,22 +499,22 @@ export default function Sales() {
 
       </div>
 
-      {/* =====================================================
-          SEARCH
-      ===================================================== */}
+      {/* SEARCH */}
 
-      <div className="
-        mx-5
-        mt-2
-        bg-white
-        rounded-xl
-        px-4
-        py-3
-        flex
-        items-center
-        gap-3
-        shadow-sm
-      ">
+      <div
+        className="
+          mx-5
+          mt-2
+          bg-white
+          rounded-xl
+          px-4
+          py-3
+          flex
+          items-center
+          gap-3
+          shadow-sm
+        "
+      >
 
         <Search
           size={16}
@@ -254,9 +536,7 @@ export default function Sales() {
 
       </div>
 
-      {/* =====================================================
-          LOADING
-      ===================================================== */}
+      {/* LOADING */}
 
       {loading && (
         <p className="text-xs text-gray-500 px-5 mt-4">
@@ -264,9 +544,7 @@ export default function Sales() {
         </p>
       )}
 
-      {/* =====================================================
-          ERROR
-      ===================================================== */}
+      {/* ERROR */}
 
       {error && (
         <p className="text-xs text-red-500 px-5 mt-4">
@@ -274,9 +552,7 @@ export default function Sales() {
         </p>
       )}
 
-      {/* =====================================================
-          SALES LIST
-      ===================================================== */}
+      {/* SALES LIST */}
 
       <div className="px-5 mt-2 space-y-3">
 
@@ -296,58 +572,76 @@ export default function Sales() {
               "
             >
 
-              {/* =================================================
-                  TOP ROW
-              ================================================= */}
+              {/* TOP ROW */}
 
               <div className="flex items-center justify-between">
 
-                <div className="flex items-center gap-3">
+                {/* CLICKABLE PROFILE + NAME */}
 
-                  {/* PROFILE CIRCLE */}
-
-                  <div className="
-                    w-10
-                    h-10
-                    rounded-full
-                    bg-[#172033]
-                    text-white
+                <button
+                  type="button"
+                  onClick={() =>
+                    openSalesDetails(item)
+                  }
+                  className="
                     flex
                     items-center
-                    justify-center
-                    text-xs
-                    font-bold
-                  ">
-                    {item.full_name?.charAt(0)}
+                    gap-3
+                    text-left
+                    flex-1
+                  "
+                >
+
+                  {/* PROFILE */}
+
+                  <div
+                    className="
+                      w-10
+                      h-10
+                      rounded-full
+                      bg-[#172033]
+                      text-white
+                      flex
+                      items-center
+                      justify-center
+                      text-xs
+                      font-bold
+                    "
+                  >
+                    {item.full_name
+                      ?.charAt(0)
+                      ?.toUpperCase()}
                   </div>
 
-                  {/* NAME + EMPLOYEE ID */}
+                  {/* NAME */}
 
                   <div>
 
-                    <p className="
-                      text-sm
-                      font-bold
-                      text-[#172033]
-                    ">
+                    <p
+                      className="
+                        text-sm
+                        font-bold
+                        text-[#172033]
+                      "
+                    >
                       {item.full_name}
                     </p>
 
-                    <p className="
-                      text-[10px]
-                      text-gray-500
-                      mt-1
-                    ">
+                    <p
+                      className="
+                        text-[10px]
+                        text-gray-500
+                        mt-1
+                      "
+                    >
                       {item.employee_id}
                     </p>
 
                   </div>
 
-                </div>
+                </button>
 
-                {/* =================================================
-                    DOWN / UP ARROW
-                ================================================= */}
+                {/* ARROW */}
 
                 <button
                   type="button"
@@ -365,7 +659,7 @@ export default function Sales() {
                     flex
                     items-center
                     justify-center
-                    hover:bg-gray-100
+                    bg-[#F8F4EE]
                   "
                 >
 
@@ -385,62 +679,71 @@ export default function Sales() {
 
               </div>
 
-              {/* =================================================
-                  EXPANDED DETAILS
-              ================================================= */}
+              {/* EXPANDED DETAILS */}
 
               {isExpanded && (
                 <div className="mt-3">
 
                   {/* ASSIGNED AREA */}
 
-                  <div className="
-                    flex
-                    items-center
-                    gap-2
-                    mb-3
-                  ">
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-2
+                      mb-3
+                    "
+                  >
 
                     <MapPin
                       size={14}
                       className="text-gray-400"
                     />
 
-                    <span className="
-                      text-[10px]
-                      text-gray-600
-                    ">
+                    <span
+                      className="
+                        text-[10px]
+                        text-gray-600
+                      "
+                    >
                       Assigned Area:
                     </span>
 
-                    <span className="
-                      text-[10px]
-                      text-[#172033]
-                      font-medium
-                    ">
-                      {item.assigned_area || "-"}
+                    <span
+                      className="
+                        text-[10px]
+                        text-[#172033]
+                        font-medium
+                      "
+                    >
+                      {item.assigned_area ||
+                        "-"}
                     </span>
 
                   </div>
 
                   {/* EMAIL */}
 
-                  <div className="
-                    flex
-                    items-center
-                    gap-2
-                    mb-3
-                  ">
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-2
+                      mb-3
+                    "
+                  >
 
                     <Mail
                       size={14}
                       className="text-gray-400"
                     />
 
-                    <span className="
-                      text-[10px]
-                      text-gray-600
-                    ">
+                    <span
+                      className="
+                        text-[10px]
+                        text-gray-600
+                      "
+                    >
                       {item.email || "-"}
                     </span>
 
@@ -448,63 +751,47 @@ export default function Sales() {
 
                   {/* PHONE */}
 
-                  <div className="
-                    flex
-                    items-center
-                    gap-2
-                  ">
+                  <div
+                    className="
+                      flex
+                      items-center
+                      gap-2
+                    "
+                  >
 
                     <Phone
                       size={14}
                       className="text-gray-400"
                     />
 
-                    <span className="
-                      text-[10px]
-                      text-gray-600
-                    ">
-                      {item.mobile_number || "-"}
+                    <span
+                      className="
+                        text-[10px]
+                        text-gray-600
+                      "
+                    >
+                      {item.mobile_number ||
+                        "-"}
                     </span>
 
                   </div>
 
-                  {/* =================================================
-                      EDIT / DELETE
-                  ================================================= */}
+                  {/* DELETE ONLY — EDIT REMOVED */}
 
-                  <div className="
-                    flex
-                    justify-end
-                    items-center
-                    gap-2
-                    mt-3
-                  ">
+                  <div
+                    className="
+                      flex
+                      justify-end
+                      items-center
+                      mt-3
+                    "
+                  >
 
                     <button
-                      onClick={() =>
-                        openEdit(item)
-                      }
                       type="button"
-                      className="
-                        border
-                        rounded
-                        px-3
-                        py-1
-                        text-[10px]
-                        flex
-                        items-center
-                        gap-1
-                      "
-                    >
-                      <Pencil size={11} />
-                      Edit
-                    </button>
-
-                    <button
                       onClick={() =>
                         deleteSales(item.id)
                       }
-                      type="button"
                       className="
                         border
                         rounded
@@ -525,11 +812,26 @@ export default function Sales() {
           );
         })}
 
+        {!loading &&
+          filteredSales.length === 0 && (
+            <div
+              className="
+                bg-white
+                rounded-xl
+                p-5
+                text-center
+                shadow-sm
+              "
+            >
+              <p className="text-xs text-gray-500">
+                No sales executives found.
+              </p>
+            </div>
+          )}
+
       </div>
 
-      {/* =====================================================
-          CREATE / EDIT SALES
-      ===================================================== */}
+      {/* CREATE / EDIT SALES */}
 
       {create && (
         <CreateSales
@@ -542,21 +844,32 @@ export default function Sales() {
 
             setError("");
 
-            const {
-              error: saveError,
-            } = editing
-              ? await supabase
-                  .from("sales_executives")
-                  .update(data)
-                  .eq("id", editing.id)
-              : await supabase
-                  .from("sales_executives")
-                  .insert(data);
+            let result;
 
-            if (saveError) {
+            if (editing) {
+
+              result = await supabase
+                .from("sales_executives")
+                .update(data)
+                .eq(
+                  "id",
+                  editing.id
+                );
+
+            } else {
+
+              result = await supabase
+                .from("sales_executives")
+                .insert(data)
+                .select()
+                .single();
+
+            }
+
+            if (result.error) {
 
               setError(
-                saveError.message
+                result.error.message
               );
 
               showError(
@@ -565,7 +878,7 @@ export default function Sales() {
                   : "Sales creation failed",
 
                 friendlyError(
-                  saveError,
+                  result.error,
                   "The sales executive could not be saved."
                 )
               );
@@ -573,23 +886,108 @@ export default function Sales() {
               return;
             }
 
+            /* EDIT SUCCESS */
+
+            if (editing) {
+
+              setCreate(false);
+              setEditing(null);
+
+              await showSuccess(
+                "Sales executive updated successfully"
+              );
+
+              loadSales();
+
+              return;
+            }
+
+            /* CREATE SUCCESS */
+
+            const mobile =
+              data.mobile_number
+                ?.replace(/\D/g, "");
+
+            if (!mobile) {
+
+              setCreate(false);
+              setEditing(null);
+
+              await showSuccess(
+                "Sales executive created successfully"
+              );
+
+              loadSales();
+
+              return;
+            }
+
+            const whatsappNumber =
+              mobile.length === 10
+                ? `91${mobile}`
+                : mobile;
+
+            const message = [
+              `*Hello ${data.full_name}*`,
+              "",
+              "Welcome to *Veda Sales Team*.",
+              "",
+              "Your Veda Sales Executive login credentials are:",
+              "",
+              `*Mobile number* ${data.mobile_number}`,
+              `*Password:* ${data.password || ""}`,
+              "",
+              "Please use these credentials to log in to the Veda Sales Executive App.",
+              "",
+              "For security, please change your password after your first login.",
+              "",
+              "Thank you,",
+              "*Veda Team*",
+            ].join("\n");
+
+            const whatsappUrl =
+              `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+                message
+              )}`;
+
             setCreate(false);
             setEditing(null);
 
-            await showSuccess(
-              editing
-                ? "Sales executive updated successfully"
-                : "Sales executive created successfully"
-            );
-
             loadSales();
+
+            const shareResult =
+              await Swal.fire({
+                icon: "success",
+                title:
+                  "Sales executive created successfully",
+                text:
+                  "Share the login credentials with the sales executive on WhatsApp.",
+                showCancelButton: true,
+                confirmButtonText:
+                  "Share on WhatsApp",
+                cancelButtonText:
+                  "Done",
+                confirmButtonColor:
+                  "#172033",
+                cancelButtonColor:
+                  "#6b7280",
+              });
+
+            if (shareResult.isConfirmed) {
+
+              window.open(
+                whatsappUrl,
+                "_blank",
+                "noopener,noreferrer"
+              );
+
+            }
+
           }}
         />
       )}
 
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
+      {/* FOOTER */}
 
       <SuperAdminFooter />
 
@@ -597,6 +995,69 @@ export default function Sales() {
   );
 }
 
+/* =========================================================
+   DETAIL ROW
+========================================================= */
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}) {
+  return (
+    <div className="flex items-center gap-3">
+
+      <div className="w-7 h-7 rounded-full bg-[#F8F4EE] flex items-center justify-center text-[#172033]">
+        {icon}
+      </div>
+
+      <div className="flex-1">
+
+        <p className="text-[10px] text-gray-500">
+          {label}
+        </p>
+
+        <p className="text-xs font-semibold text-[#172033] mt-0.5">
+          {value}
+        </p>
+
+      </div>
+
+    </div>
+  );
+}
+
+/* =========================================================
+   SALES STAT
+========================================================= */
+
+function SalesStat({
+  icon,
+  title,
+  value,
+}) {
+  return (
+    <div className="bg-white rounded-xl px-4 py-3 shadow-sm flex items-center justify-between">
+
+      <div className="flex items-center gap-3">
+
+        <div className="w-9 h-9 rounded-full bg-[#F8F4EE] flex items-center justify-center text-[#B97943]">
+          {icon}
+        </div>
+
+        <p className="text-xs font-semibold text-[#172033]">
+          {title}
+        </p>
+
+      </div>
+
+      <p className="text-sm font-bold text-[#172033]">
+        {value}
+      </p>
+
+    </div>
+  );
+}
 
 /* =========================================================
    CREATE / EDIT SALES FORM
@@ -607,9 +1068,7 @@ function CreateSales({
   addSales,
   salesItem,
 }) {
-
   const [form, setForm] = useState({
-
     id:
       salesItem?.employee_id || "",
 
@@ -630,34 +1089,23 @@ function CreateSales({
 
     email:
       salesItem?.email || "",
-
   });
 
-  /* =========================================================
-     UPDATE FORM
-  ========================================================= */
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
 
   const update = (
     key,
     value
   ) => {
-
     setForm((previous) => ({
       ...previous,
       [key]: value,
     }));
-
   };
-
-  /* =========================================================
-     ENABLE BUTTON
-     
-     CREATE:
-     Password + Confirm required
-
-     EDIT:
-     Password is not required
-  ========================================================= */
 
   const enable =
     form.id &&
@@ -672,20 +1120,12 @@ function CreateSales({
           form.confirm
     );
 
-  /* =========================================================
-     SAVE / CREATE
-  ========================================================= */
-
   const createSales = () => {
-
-    /* Password validation only
-       when password is entered */
 
     if (
       form.password !==
       form.confirm
     ) {
-
       showError(
         "Password mismatch",
         "Password and Confirm Password must be the same."
@@ -694,41 +1134,59 @@ function CreateSales({
       return;
     }
 
+    if (
+      form.password &&
+      form.password.length < 6
+    ) {
+      showError(
+        "Invalid password",
+        "Password must be at least 6 characters."
+      );
+
+      return;
+    }
+
+    const cleanPhone =
+      form.phone.replace(/\D/g, "");
+
+    if (cleanPhone.length < 10) {
+      showError(
+        "Invalid mobile number",
+        "Please enter a valid mobile number."
+      );
+
+      return;
+    }
+
     const salesData = {
       employee_id:
-        form.id,
+        form.id.trim(),
 
       full_name:
-        form.name,
+        form.name.trim(),
 
       mobile_number:
-        form.phone,
+        form.phone.trim(),
 
       assigned_area:
-        form.area,
+        form.area.trim(),
 
       email:
-        form.email,
+        form.email.trim(),
+
+      status:
+        "Active",
     };
 
-    /* Only send password when:
-       creating OR changing password */
-
-    if (
-      form.password
-    ) {
+    if (form.password) {
       salesData.password =
         form.password;
     }
 
-    addSales(
-      salesData
-    );
-
+    addSales(salesData);
   };
 
   return (
-
     <div
       id="create-sales-form"
       className="
@@ -742,17 +1200,15 @@ function CreateSales({
       "
     >
 
-      {/* =================================================
-          FORM TITLE
-      ================================================= */}
-
       <div className="mb-5">
 
-        <h2 className="
-          text-sm
-          font-bold
-          text-[#172033]
-        ">
+        <h2
+          className="
+            text-sm
+            font-bold
+            text-[#172033]
+          "
+        >
           {salesItem
             ? "EDIT SALES EXECUTIVE"
             : "CREATE SALES EXECUTIVE"}
@@ -760,20 +1216,15 @@ function CreateSales({
 
       </div>
 
-
-      {/* =================================================
-          TWO COLUMN FORM
-      ================================================= */}
-
-      <div className="
-        grid
-        grid-cols-1
-        md:grid-cols-2
-        gap-x-5
-        gap-y-5
-      ">
-
-        {/* EMPLOYEE ID */}
+      <div
+        className="
+          grid
+          grid-cols-1
+          md:grid-cols-2
+          gap-x-5
+          gap-y-5
+        "
+      >
 
         <SalesInput
           icon={
@@ -787,9 +1238,6 @@ function CreateSales({
           placeholder="Enter Employee ID"
         />
 
-
-        {/* FULL NAME */}
-
         <SalesInput
           icon={
             <UserRound size={14} />
@@ -801,9 +1249,6 @@ function CreateSales({
           }
           placeholder="Enter Full Name"
         />
-
-
-        {/* ASSIGNED AREA */}
 
         <SalesInput
           icon={
@@ -817,9 +1262,6 @@ function CreateSales({
           placeholder="Enter Area"
         />
 
-
-        {/* MOBILE NUMBER */}
-
         <SalesInput
           icon={
             <Phone size={14} />
@@ -831,9 +1273,6 @@ function CreateSales({
           }
           placeholder="Enter Mobile Number"
         />
-
-
-        {/* EMAIL */}
 
         <SalesInput
           icon={
@@ -847,58 +1286,44 @@ function CreateSales({
           placeholder="Enter Email Address"
         />
 
-
-        {/* PASSWORD */}
-
-        <SalesInput
-          icon={
-            <Lock size={14} />
-          }
+        <PasswordSalesInput
           label="Password"
-          type="password"
           value={form.password}
           change={(v) =>
             update("password", v)
           }
           placeholder="Enter Password"
+          showPassword={showPassword}
+          setShowPassword={setShowPassword}
         />
 
-
-        {/* CONFIRM PASSWORD */}
-
-        <SalesInput
-          icon={
-            <Lock size={14} />
-          }
+        <PasswordSalesInput
           label="Confirm Password"
-          type="password"
           value={form.confirm}
           change={(v) =>
             update("confirm", v)
           }
           placeholder="Confirm Password"
+          showPassword={
+            showConfirmPassword
+          }
+          setShowPassword={
+            setShowConfirmPassword
+          }
         />
 
       </div>
 
-
-      {/* =================================================
-          BUTTONS
-
-          mb-24 on parent + pb-2 here keeps buttons
-          visible above fixed footer.
-      ================================================= */}
-
-      <div className="
-        flex
-        items-center
-        justify-end
-        gap-2
-        mt-6
-        pb-2
-      ">
-
-        {/* CANCEL */}
+      <div
+        className="
+          flex
+          items-center
+          justify-end
+          gap-2
+          mt-6
+          pb-2
+        "
+      >
 
         <button
           type="button"
@@ -917,9 +1342,6 @@ function CreateSales({
           Cancel
         </button>
 
-
-        {/* SAVE / CREATE */}
-
         <button
           type="button"
           disabled={!enable}
@@ -930,7 +1352,6 @@ function CreateSales({
             rounded-md
             text-xs
             text-white
-
             ${
               enable
                 ? "bg-[#172033]"
@@ -949,10 +1370,8 @@ function CreateSales({
   );
 }
 
-
 /* =========================================================
    SALES INPUT
-   Same style as your reference image
 ========================================================= */
 
 function SalesInput({
@@ -963,45 +1382,43 @@ function SalesInput({
   change,
   type = "text",
 }) {
-
   return (
-
     <div>
 
-      {/* LABEL */}
-
-      <label className="
-        block
-        text-[10px]
-        text-[#172033]
-        mb-1.5
-      ">
+      <label
+        className="
+          block
+          text-[10px]
+          text-[#172033]
+          mb-1.5
+        "
+      >
         {label}
       </label>
 
-
-      {/* INPUT BOX */}
-
-      <div className="
-        h-[32px]
-        border
-        border-[#172033]
-        rounded-[4px]
-        flex
-        items-center
-        px-2.5
-        bg-white
-      ">
-
-        <span className="
-          text-gray-400
-          mr-2
+      <div
+        className="
+          h-[32px]
+          border
+          border-[#172033]
+          rounded-[4px]
           flex
           items-center
-        ">
+          px-2.5
+          bg-white
+        "
+      >
+
+        <span
+          className="
+            text-gray-400
+            mr-2
+            flex
+            items-center
+          "
+        >
           {icon}
         </span>
-
 
         <input
           type={type}
@@ -1020,6 +1437,109 @@ function SalesInput({
             bg-transparent
           "
         />
+
+      </div>
+
+    </div>
+  );
+}
+
+/* =========================================================
+   PASSWORD INPUT
+========================================================= */
+
+function PasswordSalesInput({
+  label,
+  placeholder,
+  value,
+  change,
+  showPassword,
+  setShowPassword,
+}) {
+  return (
+    <div>
+
+      <label
+        className="
+          block
+          text-[10px]
+          text-[#172033]
+          mb-1.5
+        "
+      >
+        {label}
+      </label>
+
+      <div
+        className="
+          h-[32px]
+          border
+          border-[#172033]
+          rounded-[4px]
+          flex
+          items-center
+          px-2.5
+          bg-white
+        "
+      >
+
+        <span
+          className="
+            text-gray-400
+            mr-2
+            flex
+            items-center
+          "
+        >
+          <Lock size={14} />
+        </span>
+
+        <input
+          type={
+            showPassword
+              ? "text"
+              : "password"
+          }
+          value={value}
+          onChange={(e) =>
+            change(
+              e.target.value
+            )
+          }
+          placeholder={placeholder}
+          className="
+            outline-none
+            text-[10px]
+            text-[#172033]
+            w-full
+            bg-transparent
+          "
+        />
+
+        <button
+          type="button"
+          onClick={() =>
+            setShowPassword(
+              !showPassword
+            )
+          }
+          className="
+            text-gray-400
+            hover:text-[#172033]
+            flex
+            items-center
+            justify-center
+            ml-2
+          "
+        >
+
+          {showPassword ? (
+            <EyeOff size={14} />
+          ) : (
+            <Eye size={14} />
+          )}
+
+        </button>
 
       </div>
 

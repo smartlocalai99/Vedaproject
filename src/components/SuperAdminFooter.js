@@ -54,7 +54,7 @@ export default function SuperAdminFooter() {
                 size={22}
                 className={
                   active
-                    ? "text-[#0F1F35]"
+                    ? "text-[#B56A38]"
                     : "text-gray-400"
                 }
               />
@@ -62,7 +62,7 @@ export default function SuperAdminFooter() {
               <span
                 className={`text-[11px] mt-1 ${
                   active
-                    ? "text-[#0F1F35] font-semibold"
+                    ? "text-[#B56A38] font-semibold"
                     : "text-gray-500"
                 }`}
               >
