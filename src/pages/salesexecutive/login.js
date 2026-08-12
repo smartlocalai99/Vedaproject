@@ -8,16 +8,14 @@ import { showError } from "@/lib/alerts";
 export default function SalesLogin() {
   const router = useRouter();
 
-  const [showPassword, setShowPassword] =
-    useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [form, setForm] = useState({
     mobileNumber: "",
     password: "",
   });
 
-  const [loading, setLoading] =
-    useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setForm({
@@ -29,15 +27,14 @@ export default function SalesLogin() {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    if (
-      !form.mobileNumber ||
-      !form.password
-    ) {
+    const mobileNumber = form.mobileNumber.trim();
+    const password = form.password.trim();
+
+    if (!mobileNumber || !password) {
       showError(
         "Missing login fields",
         "Please enter Mobile Number and Password."
       );
-
       return;
     }
 
@@ -52,21 +49,12 @@ export default function SalesLogin() {
         .select(
           "id, employee_id, full_name, email, mobile_number, assigned_area, status, created_at"
         )
-        .eq(
-          "mobile_number",
-          form.mobileNumber.trim()
-        )
-        .eq(
-          "password",
-          form.password
-        )
+        .eq("mobile_number", mobileNumber)
+        .eq("password", password)
         .maybeSingle();
 
       if (loginError) {
-        console.error(
-          "SALES LOGIN ERROR:",
-          loginError
-        );
+        console.error("SALES LOGIN ERROR:", loginError);
 
         showError(
           "Login Failed",
@@ -76,13 +64,19 @@ export default function SalesLogin() {
         return;
       }
 
-      if (
-        !data ||
-        data.status !== "Active"
-      ) {
+      if (!data) {
         showError(
           "Login Failed",
           "Invalid Mobile Number or password."
+        );
+
+        return;
+      }
+
+      if (data.status !== "Active") {
+        showError(
+          "Login Failed",
+          "Your account is inactive. Please contact the administrator."
         );
 
         return;
@@ -93,14 +87,9 @@ export default function SalesLogin() {
         JSON.stringify(data)
       );
 
-      router.push(
-        "/salesexecutive/dashboard"
-      );
+      router.push("/salesexecutive/dashboard");
     } catch (error) {
-      console.error(
-        "SALES LOGIN EXCEPTION:",
-        error
-      );
+      console.error("SALES LOGIN EXCEPTION:", error);
 
       showError(
         "Login Failed",
@@ -111,22 +100,14 @@ export default function SalesLogin() {
     }
   };
 
-  /*
-   * =====================================================
-   * FORGOT PASSWORD
-   * =====================================================
-   */
-
   const handleForgotPassword = () => {
-    router.push(
-      "/salesexecutive/reset-password"
-    );
+    router.push("/salesexecutive/reset-password");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4 -translate-y-12">
 
-      <div className="bg-white rounded-3xl shadow-lg w-full max-w-md p-8">
+      <div className="bg-white rounded-3xl shadow-lg w-full  p-8">
 
         {/* LOGO */}
 
@@ -217,11 +198,7 @@ export default function SalesLogin() {
               />
 
               <input
-                type={
-                  showPassword
-                    ? "text"
-                    : "password"
-                }
+                type={showPassword ? "text" : "password"}
                 name="password"
                 value={form.password}
                 onChange={handleChange}
@@ -242,11 +219,7 @@ export default function SalesLogin() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setShowPassword(
-                    !showPassword
-                  )
-                }
+                onClick={() => setShowPassword(!showPassword)}
                 className="
                   absolute
                   right-4
@@ -283,9 +256,7 @@ export default function SalesLogin() {
               disabled:cursor-not-allowed
             "
           >
-            {loading
-              ? "Logging in..."
-              : "Login"}
+            {loading ? "Logging in..." : "Login"}
           </button>
 
         </form>

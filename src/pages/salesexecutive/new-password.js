@@ -133,9 +133,9 @@ export default function NewPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4 -translate-y-12">
 
-      <div className="bg-white rounded-3xl shadow-lg w-full max-w-md p-8">
+      <div className="bg-white rounded-3xl shadow-lg w-full  p-8">
 
         <div className="text-center mb-8">
 
@@ -152,16 +152,12 @@ export default function NewPassword() {
 
           </div>
 
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-3xl font-bold -mt-2">
             New Password
           </h1>
 
           <p className="text-gray-500 mt-2">
             Create your new password
-          </p>
-
-          <p className="text-[#b56a38] text-sm mt-2 break-all">
-            {email}
           </p>
 
         </div>
@@ -175,7 +171,7 @@ export default function NewPassword() {
 
           <div>
 
-            <label className="block mb-2 font-medium">
+            <label className="block mb-2 -mt-2 font-medium">
               New Password
             </label>
 
