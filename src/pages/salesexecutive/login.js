@@ -105,7 +105,7 @@ export default function SalesLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4 -translate-y-12">
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4 ">
 
       <div className="bg-white rounded-3xl shadow-lg w-full  p-8">
 
