@@ -14,7 +14,7 @@ export default function App({ Component, pageProps }) {
     }
   }, []);
 
-  const manifest = isSales ? "/sales-manifest.json" : isSuperAdmin ? "/superadmin-manifest.json" : null;
+  const manifest = isSales ? "/sales-manifest.json" : null;
   const themeColor = isSales ? "#13273C" : "#111827";
 
   return <><Head>{manifest && <><link rel="manifest" href={manifest} /><meta name="theme-color" content={themeColor} /><link rel="icon" href="/icons/veda-192.png" /></>}</Head><Component {...pageProps} /></>;
