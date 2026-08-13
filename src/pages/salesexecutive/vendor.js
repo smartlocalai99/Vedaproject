@@ -9,6 +9,7 @@ import {
   Eye,
   EyeOff,
   CheckCircle,
+  CreditCard,
 } from "lucide-react";
 
 import { useRouter } from "next/router";
@@ -34,6 +35,7 @@ export default function Vendor() {
     email: "",
     city: "",
     address: "",
+    upi_id: "",
     offer_percentage: "",
     password: "",
     confirm_password: "",
@@ -145,6 +147,9 @@ export default function Vendor() {
         address:
           addressParts.slice(1).join(", "),
 
+        upi_id:
+          data.upi_id || "",
+
         offer_percentage:
           data.offer_percentage !== null &&
           data.offer_percentage !== undefined
@@ -191,25 +196,10 @@ export default function Vendor() {
       return;
     }
 
-    /*
-     * Indian number
-     *
-     * 9876543210
-     * becomes
-     * 919876543210
-     */
-
     const whatsappNumber =
       vendorMobile.length === 10
         ? `91${vendorMobile}`
         : vendorMobile;
-
-    /*
-     * Sales Executive details
-     *
-     * This is the actual logged-in
-     * Sales Executive, not a dummy number.
-     */
 
     const salesName =
       salesExecutive?.full_name ||
@@ -218,10 +208,6 @@ export default function Vendor() {
     const salesMobile =
       salesExecutive?.mobile_number ||
       "";
-
-    /*
-     * NO EMAIL IN MESSAGE
-     */
 
     const message = [
       `*Hello ${form.business_name}*,`,
@@ -340,6 +326,31 @@ export default function Vendor() {
     }
 
     /* =========================
+       UPI VALIDATION
+    ========================= */
+
+    const cleanUpiId =
+      form.upi_id.trim();
+
+    if (!cleanUpiId) {
+      return showError(
+        "UPI ID required",
+        "Please enter the vendor UPI ID."
+      );
+    }
+
+    if (
+      !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/.test(
+        cleanUpiId
+      )
+    ) {
+      return showError(
+        "Invalid UPI ID",
+        "Please enter a valid UPI ID, for example vendor@ybl."
+      );
+    }
+
+    /* =========================
        OFFER VALIDATION
     ========================= */
 
@@ -397,6 +408,9 @@ export default function Vendor() {
         .filter(Boolean)
         .join(", "),
 
+      upi_id:
+        cleanUpiId,
+
       offer_percentage:
         offerPercentage,
 
@@ -437,6 +451,11 @@ export default function Vendor() {
     ========================= */
 
     if (result.error) {
+      console.log(
+        "VENDOR SAVE ERROR:",
+        result.error
+      );
+
       return showError(
         editingId
           ? "Vendor update failed"
@@ -704,6 +723,19 @@ export default function Vendor() {
                   value={form.address}
                   onChange={handleChange}
                   required={false}
+                />
+
+                {/* ================= UPI ID ================= */}
+
+                <InputBox
+                  icon={<CreditCard size={12} />}
+                  label="UPI ID"
+                  placeholder="example@ybl"
+                  type="text"
+                  name="upi_id"
+                  value={form.upi_id}
+                  onChange={handleChange}
+                  required
                 />
 
                 <InputBox
