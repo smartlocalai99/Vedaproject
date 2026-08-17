@@ -101,16 +101,6 @@ export default function Dashboard() {
           );
         }
 
-        console.log(
-          "TOTAL VENDORS:",
-          vendorsResult.count
-        );
-
-        console.log(
-          "TOTAL MEMBERS:",
-          membersResult.count
-        );
-
         setStatsData({
           vendors: vendorsResult.count || 0,
           members: membersResult.count || 0,
@@ -1157,7 +1147,6 @@ export default function Dashboard() {
     </div>
   );
 }
-
 
 
 

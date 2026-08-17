@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
@@ -24,13 +25,10 @@ import {
   MapPin,
   ChevronDown,
   ChevronUp,
-  BadgeCheck,
   Eye,
   EyeOff,
   Store,
   Users,
-  ReceiptText,
-  IndianRupee,
 } from "lucide-react";
 
 export default function Sales() {
@@ -47,7 +45,6 @@ export default function Sales() {
 
   const [expanded, setExpanded] = useState(null);
 
-  // Selected sales executive details
   const [selectedSales, setSelectedSales] = useState(null);
 
   const [salesStats, setSalesStats] = useState({
@@ -96,12 +93,6 @@ export default function Sales() {
     setStatsLoading(true);
 
     try {
-      /*
-       * VENDORS
-       *
-       * Assumes vendors.sales_id points to
-       * sales_executives.id.
-       */
       const vendorsQuery = await supabase
         .from("vendors")
         .select("id", {
@@ -110,12 +101,6 @@ export default function Sales() {
         })
         .eq("sales_id", item.id);
 
-      /*
-       * MEMBERS
-       *
-       * Assumes members.sales_id points to
-       * sales_executives.id.
-       */
       const membersQuery = await supabase
         .from("members")
         .select("id", {
@@ -124,11 +109,6 @@ export default function Sales() {
         })
         .eq("sales_id", item.id);
 
-      /*
-       * GET VENDORS ASSIGNED TO THIS SALES EXECUTIVE
-       *
-       * Transactions are connected through vendor_id.
-       */
       const vendorListQuery = await supabase
         .from("vendors")
         .select("id")
@@ -170,11 +150,8 @@ export default function Sales() {
 
       setSalesStats({
         vendors: vendorsQuery.count || 0,
-
         members: membersQuery.count || 0,
-
         transactions: transactionCount,
-
         benefits: benefitTotal,
       });
     } catch (err) {
@@ -393,7 +370,6 @@ export default function Sales() {
               }
             />
 
-
           </div>
 
         </div>
@@ -427,7 +403,6 @@ export default function Sales() {
                   : salesStats.members
               }
             />
-
 
           </div>
 
@@ -776,7 +751,7 @@ export default function Sales() {
 
                   </div>
 
-                  {/* DELETE ONLY — EDIT REMOVED */}
+                  {/* DELETE ONLY */}
 
                   <div
                     className="
@@ -904,6 +879,9 @@ export default function Sales() {
 
             /* CREATE SUCCESS */
 
+            const createdEmployeeId =
+              result.data?.employee_id || "";
+
             const mobile =
               data.mobile_number
                 ?.replace(/\D/g, "");
@@ -934,7 +912,8 @@ export default function Sales() {
               "",
               "Your Veda Sales Executive login credentials are:",
               "",
-              `*Mobile number* ${data.mobile_number}`,
+              `*Employee ID:* ${createdEmployeeId}`,
+              `*Mobile number:* ${data.mobile_number}`,
               `*Password:* ${data.password || ""}`,
               "",
               "Please use these credentials to log in to the Veda Sales Executive App.",
@@ -1069,9 +1048,6 @@ function CreateSales({
   salesItem,
 }) {
   const [form, setForm] = useState({
-    id:
-      salesItem?.employee_id || "",
-
     password:
       salesItem?.password || "",
 
@@ -1108,7 +1084,6 @@ function CreateSales({
   };
 
   const enable =
-    form.id &&
     form.name &&
     form.phone &&
     form.area &&
@@ -1159,9 +1134,6 @@ function CreateSales({
     }
 
     const salesData = {
-      employee_id:
-        form.id.trim(),
-
       full_name:
         form.name.trim(),
 
@@ -1225,18 +1197,6 @@ function CreateSales({
           gap-y-5
         "
       >
-
-        <SalesInput
-          icon={
-            <BadgeCheck size={14} />
-          }
-          label="Employee ID"
-          value={form.id}
-          change={(v) =>
-            update("id", v)
-          }
-          placeholder="Enter Employee ID"
-        />
 
         <SalesInput
           icon={

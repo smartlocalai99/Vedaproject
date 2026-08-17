@@ -19,6 +19,10 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
 import { supabase } from "@/lib/supabase";
@@ -63,6 +67,20 @@ export default function Dashboard() {
   const [
     vendorPerformance,
     setVendorPerformance,
+  ] = useState([]);
+
+  /* =====================================================
+     COLLECTION PERFORMANCE
+     ===================================================== */
+
+  const [
+    collectionPeriod,
+    setCollectionPeriod,
+  ] = useState("month");
+
+  const [
+    collectionPerformance,
+    setCollectionPerformance,
   ] = useState([]);
 
   /* =====================================================
@@ -165,7 +183,7 @@ export default function Dashboard() {
         } = await supabase
           .from("sales_executives")
           .select(
-            "id, full_name"
+            "id, employee_id, full_name"
           )
           .order("full_name", {
             ascending: true,
@@ -184,7 +202,7 @@ export default function Dashboard() {
         let memberQuery = supabase
           .from("members")
           .select(
-            "id, sales_id, created_at"
+            "id, employee_id, created_at"
           );
 
         if (
@@ -240,12 +258,23 @@ export default function Dashboard() {
               const count =
                 (members || []).filter(
                   (member) =>
-                    member.sales_id ===
-                    salesExecutive.id
+                    String(
+                      member.employee_id || ""
+                    )
+                      .trim()
+                      .toLowerCase() ===
+                    String(
+                      salesExecutive.employee_id ||
+                        ""
+                    )
+                      .trim()
+                      .toLowerCase()
                 ).length;
 
               return {
                 id: salesExecutive.id,
+                employee_id:
+                  salesExecutive.employee_id,
                 name:
                   salesExecutive.full_name ||
                   "Unknown",
@@ -405,6 +434,186 @@ export default function Dashboard() {
   ]);
 
   /* =====================================================
+     LOAD COLLECTION PERFORMANCE
+     ===================================================== */
+
+  useEffect(() => {
+    async function loadCollectionPerformance() {
+      try {
+        let transactionQuery =
+          supabase
+            .from("transactions")
+            .select(
+              "id, final_amount, payment_method, created_at"
+            );
+
+        const now = new Date();
+
+        if (
+          collectionPeriod ===
+          "month"
+        ) {
+          const startOfMonth =
+            new Date(
+              now.getFullYear(),
+              now.getMonth(),
+              1
+            );
+
+          const startOfNextMonth =
+            new Date(
+              now.getFullYear(),
+              now.getMonth() + 1,
+              1
+            );
+
+          transactionQuery =
+            transactionQuery
+              .gte(
+                "created_at",
+                startOfMonth.toISOString()
+              )
+              .lt(
+                "created_at",
+                startOfNextMonth.toISOString()
+              );
+        }
+
+        if (
+          collectionPeriod ===
+          "week"
+        ) {
+          const day =
+            now.getDay();
+
+          const difference =
+            day === 0
+              ? 6
+              : day - 1;
+
+          const startOfWeek =
+            new Date(now);
+
+          startOfWeek.setDate(
+            now.getDate() -
+              difference
+          );
+
+          startOfWeek.setHours(
+            0,
+            0,
+            0,
+            0
+          );
+
+          const startOfNextWeek =
+            new Date(
+              startOfWeek
+            );
+
+          startOfNextWeek.setDate(
+            startOfWeek.getDate() +
+              7
+          );
+
+          transactionQuery =
+            transactionQuery
+              .gte(
+                "created_at",
+                startOfWeek.toISOString()
+              )
+              .lt(
+                "created_at",
+                startOfNextWeek.toISOString()
+              );
+        }
+
+        const {
+          data: transactions,
+          error: transactionError,
+        } =
+          await transactionQuery;
+
+        if (transactionError) {
+          console.error(
+            "COLLECTION ERROR:",
+            transactionError
+          );
+
+          setCollectionPerformance([]);
+          return;
+        }
+
+        let cash = 0;
+        let upi = 0;
+
+        (
+          transactions || []
+        ).forEach(
+          (transaction) => {
+            const amount =
+              Number(
+                transaction.final_amount ||
+                  0
+              );
+
+            if (!amount) {
+              return;
+            }
+
+            const paymentMethod =
+              (
+                transaction.payment_method ||
+                ""
+              )
+                .toString()
+                .trim()
+                .toLowerCase();
+
+            if (
+              paymentMethod ===
+                "cash" ||
+              paymentMethod ===
+                "cod"
+            ) {
+              cash += amount;
+            }
+
+            if (
+              paymentMethod ===
+              "upi"
+            ) {
+              upi += amount;
+            }
+          }
+        );
+
+        setCollectionPerformance([
+          {
+            name: "Cash",
+            value: cash,
+          },
+          {
+            name: "UPI",
+            value: upi,
+          },
+        ]);
+      } catch (error) {
+        console.error(
+          "COLLECTION PERFORMANCE EXCEPTION:",
+          error
+        );
+
+        setCollectionPerformance([]);
+      }
+    }
+
+    loadCollectionPerformance();
+  }, [
+    collectionPeriod,
+  ]);
+
+  /* =====================================================
      SALES TOOLTIP
      ===================================================== */
 
@@ -422,7 +631,6 @@ export default function Dashboard() {
 
     return (
       <div className="rounded-lg border border-[#E7DDD4] bg-white px-3 py-2 shadow-lg">
-
         <p className="text-xs text-[#8A7D72]">
           Cards Onboarded
         </p>
@@ -434,7 +642,6 @@ export default function Dashboard() {
             "en-IN"
           )}
         </p>
-
       </div>
     );
   };
@@ -458,7 +665,6 @@ export default function Dashboard() {
 
     return (
       <div className="rounded-lg border border-[#E7DDD4] bg-white px-3 py-2 shadow-lg">
-
         <p className="text-xs text-[#8A7D72]">
           {label}
         </p>
@@ -471,7 +677,42 @@ export default function Dashboard() {
           )}{" "}
           Transactions
         </p>
+      </div>
+    );
+  };
 
+  /* =====================================================
+     COLLECTION PIE TOOLTIP
+     ===================================================== */
+
+  const CollectionPieTooltip = ({
+    active,
+    payload,
+  }) => {
+    if (
+      !active ||
+      !payload ||
+      !payload.length
+    ) {
+      return null;
+    }
+
+    const item = payload[0];
+
+    return (
+      <div className="rounded-lg border border-[#E7DDD4] bg-white px-3 py-2 shadow-lg">
+        <p className="text-xs text-[#756B63]">
+          {item.name}
+        </p>
+
+        <p className="mt-1 text-sm font-bold text-[#16120e]">
+          ₹
+          {Number(
+            item.value || 0
+          ).toLocaleString(
+            "en-IN"
+          )}
+        </p>
       </div>
     );
   };
@@ -483,9 +724,7 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-[#F7F7F7] pb-24">
 
-      {/* =================================================
-          HEADER
-          ================================================= */}
+      {/* HEADER */}
 
       <div
         className="
@@ -497,7 +736,6 @@ export default function Dashboard() {
           gap-3
         "
       >
-
         <Image
           src="/logo.png"
           alt="Logo"
@@ -507,7 +745,6 @@ export default function Dashboard() {
         />
 
         <div>
-
           <h1 className="text-white text-sm font-bold">
             VEDA MINDS
           </h1>
@@ -515,21 +752,14 @@ export default function Dashboard() {
           <p className="text-[10px] text-[#D6A15E]">
             SUPER ADMIN
           </p>
-
         </div>
-
       </div>
 
-
-      {/* =================================================
-          STATS
-          ================================================= */}
+      {/* STATS */}
 
       <div className="px-3 -mt-2 pt-5">
 
         <div className="grid grid-cols-2 gap-2">
-
-          {/* SALES */}
 
           <Stat
             icon={
@@ -547,8 +777,6 @@ export default function Dashboard() {
             }
           />
 
-          {/* VENDORS */}
-
           <Stat
             icon={
               <Store
@@ -564,8 +792,6 @@ export default function Dashboard() {
               )
             }
           />
-
-          {/* MEMBERS */}
 
           <Stat
             icon={
@@ -583,8 +809,6 @@ export default function Dashboard() {
             }
           />
 
-          {/* TRANSACTIONS */}
-
           <Stat
             icon={
               <FileText
@@ -600,8 +824,6 @@ export default function Dashboard() {
               )
             }
           />
-
-          {/* BENEFITS */}
 
           <div className="col-span-2">
 
@@ -630,10 +852,7 @@ export default function Dashboard() {
 
       </div>
 
-
-      {/* =================================================
-          ERROR
-          ================================================= */}
+      {/* ERROR */}
 
       {error && (
         <div className="px-3 mt-3">
@@ -649,18 +868,13 @@ export default function Dashboard() {
         </div>
       )}
 
-
-      {/* =================================================
-          QUICK ACTIONS
-          ================================================= */}
+      {/* QUICK ACTIONS */}
 
       <div className="px-3 mt-3">
 
         <h3 className="text-sm font-bold mb-2">
           Quick Actions
         </h3>
-
-        {/* ADD SALES */}
 
         <button
           onClick={() =>
@@ -707,9 +921,6 @@ export default function Dashboard() {
           </span>
 
         </button>
-
-
-        {/* ADD VENDOR */}
 
         <button
           onClick={() =>
@@ -758,10 +969,9 @@ export default function Dashboard() {
 
       </div>
 
-
-      {/* =================================================
+      {/* =====================================================
           SALES PERFORMANCE
-          ================================================= */}
+          ===================================================== */}
 
       <div className="px-3 mt-4">
 
@@ -778,9 +988,6 @@ export default function Dashboard() {
             </p>
 
           </div>
-
-
-          {/* FILTER */}
 
           <div className="mt-4 flex h-10 rounded-xl bg-[#F5F1ED] p-1">
 
@@ -820,9 +1027,6 @@ export default function Dashboard() {
 
           </div>
 
-
-          {/* SALES GRAPH */}
-
           <div
             className="mt-4 w-full"
             style={{
@@ -836,7 +1040,7 @@ export default function Dashboard() {
           >
 
             {salesPerformance.length ===
-              0 ? (
+            0 ? (
 
               <div className="flex h-full items-center justify-center">
 
@@ -941,16 +1145,13 @@ export default function Dashboard() {
 
       </div>
 
-
-      {/* =================================================
+      {/* =====================================================
           VENDOR PERFORMANCE
-          ================================================= */}
+          ===================================================== */}
 
       <div className="px-3 mt-4">
 
         <div className="rounded-2xl border border-[#E9E2DC] bg-white p-3">
-
-          {/* TITLE */}
 
           <div>
 
@@ -963,9 +1164,6 @@ export default function Dashboard() {
             </p>
 
           </div>
-
-
-          {/* FILTER */}
 
           <div className="mt-4 flex h-10 rounded-xl bg-[#F5F1ED] p-1">
 
@@ -1005,9 +1203,6 @@ export default function Dashboard() {
 
           </div>
 
-
-          {/* VENDOR GRAPH */}
-
           <div
             className="mt-5 w-full"
             style={{
@@ -1016,7 +1211,7 @@ export default function Dashboard() {
           >
 
             {vendorPerformance.length ===
-              0 ? (
+            0 ? (
 
               <div className="flex h-full items-center justify-center">
 
@@ -1137,10 +1332,9 @@ export default function Dashboard() {
 
           </div>
 
-
           <div className="flex justify-center">
 
-            <p className=" -mt-15 text-[10px] text-[#8A7D72]">
+            <p className="-mt-15 text-[10px] text-[#8A7D72]">
               Number of Transactions
             </p>
 
@@ -1150,17 +1344,203 @@ export default function Dashboard() {
 
       </div>
 
+      {/* =====================================================
+          COLLECTION PERFORMANCE - PIE CHART
+          ===================================================== */}
 
-      {/* =================================================
-          FOOTER
-          ================================================= */}
+      <div className="px-3 mt-4">
+
+        <div className="rounded-2xl border border-[#E9E2DC] bg-white p-4">
+
+          <div>
+
+            <h3 className="text-[16px] font-bold text-[#16120e]">
+              Collection Performance
+            </h3>
+
+            <p className="mt-1 text-[11px] text-[#8A7D72]">
+              Cash, UPI
+            </p>
+
+          </div>
+
+          {/* PERIOD FILTER */}
+
+          <div className="mt-4 flex h-10 rounded-xl bg-[#F5F1ED] p-1">
+
+            <button
+              type="button"
+              onClick={() =>
+                setCollectionPeriod(
+                  "week"
+                )
+              }
+              className={`flex-1 rounded-lg text-xs font-semibold ${
+                collectionPeriod ===
+                "week"
+                  ? "bg-[#B97943] text-white"
+                  : "text-[#756B63]"
+              }`}
+            >
+              Week
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setCollectionPeriod(
+                  "month"
+                )
+              }
+              className={`flex-1 rounded-lg text-xs font-semibold ${
+                collectionPeriod ===
+                "month"
+                  ? "bg-[#B97943] text-white"
+                  : "text-[#756B63]"
+              }`}
+            >
+              Month
+            </button>
+
+          </div>
+
+          {/* PIE CHART */}
+
+          <div
+            className="mt-3 w-full"
+            style={{
+              height: 300,
+            }}
+          >
+
+            {collectionPerformance.length ===
+            0 ||
+            collectionPerformance.every(
+              (item) =>
+                Number(
+                  item.value || 0
+                ) === 0
+            ) ? (
+
+              <div className="flex h-full items-center justify-center">
+
+                <p className="text-xs text-[#8A7D72]">
+                  No collection data available.
+                </p>
+
+              </div>
+
+            ) : (
+
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+
+                <PieChart>
+
+                  <Pie
+                    data={
+                      collectionPerformance
+                    }
+                    cx="50%"
+                    cy="45%"
+                    innerRadius={70}
+                    outerRadius={105}
+                    paddingAngle={3}
+                    dataKey="value"
+                    nameKey="name"
+                    stroke="#FFFFFF"
+                    strokeWidth={3}
+                  >
+
+                    {collectionPerformance.map(
+                      (entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={
+                            index === 0
+                              ? "#172033"
+                              : "#B97943"
+                          }
+                        />
+                      )
+                    )}
+
+                  </Pie>
+
+                  <Tooltip
+                    content={
+                      <CollectionPieTooltip />
+                    }
+                  />
+
+                  <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    iconType="circle"
+                    iconSize={9}
+                    formatter={(value) => (
+                      <span className="text-[11px] text-[#756B63]">
+                        {value}
+                      </span>
+                    )}
+                  />
+
+                </PieChart>
+
+              </ResponsiveContainer>
+
+            )}
+
+          </div>
+
+          {/* TOTAL COLLECTION */}
+
+          {collectionPerformance.length >
+            0 && (
+            <div className="flex justify-center -mt-2">
+
+              <div className="text-center">
+
+                <p className="text-[10px] text-[#8A7D72]">
+                  Total Collection
+                </p>
+
+                <p className="mt-1 text-[18px] font-bold text-[#16120e]">
+
+                  ₹
+                  {collectionPerformance
+                    .reduce(
+                      (total, item) =>
+                        total +
+                        Number(
+                          item.value || 0
+                        ),
+                      0
+                    )
+                    .toLocaleString(
+                      "en-IN"
+                    )}
+
+                </p>
+
+              </div>
+
+            </div>
+          )}
+
+        </div>
+
+      </div>
+
+      {/* FOOTER */}
 
       <SuperAdminFooter />
 
     </main>
   );
 }
-
 
 /* =====================================================
    STAT CARD

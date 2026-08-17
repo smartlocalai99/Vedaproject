@@ -26,6 +26,7 @@ export default function SalesLogin() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (loading) return;
 
     const mobileNumber = form.mobileNumber.trim();
     const password = form.password.trim();

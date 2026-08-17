@@ -1,6 +1,6 @@
 {
-  "name": "Veda SuperAdmin",
-  "short_name": "Veda Admin",
+  "name": "Super Admin",
+  "short_name": "Super Admin",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

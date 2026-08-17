@@ -10,6 +10,7 @@ export default class VedaDocument extends Document {
     const isSuperAdmin = this.props.pathname === "/" || this.props.pathname?.startsWith("/superadmin");
     return <Html lang="en">
       <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         {isSuperAdmin && <>
           <link rel="manifest" href="/manifest.json" />
           <meta name="theme-color" content="#171d2b" />

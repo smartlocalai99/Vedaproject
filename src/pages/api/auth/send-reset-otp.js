@@ -58,11 +58,6 @@ export default async function handler(req, res) {
       .trim()
       .toLowerCase();
 
-    console.log("=================================");
-    console.log("SEND RESET OTP");
-    console.log("To:", cleanEmail);
-    console.log("SMTP USER:", process.env.SMTP_USER);
-    console.log("=================================");
 
     /*
      * =================================================
@@ -131,7 +126,6 @@ export default async function handler(req, res) {
       100000 + Math.random() * 900000
     ).toString();
 
-    console.log("OTP GENERATED:", otp);
 
     /*
      * =================================================
@@ -199,7 +193,6 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log("OTP SAVED TO DATABASE");
 
     /*
      * =================================================

@@ -44,14 +44,11 @@ export default function Vendor() {
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState("");
 
-  const [showPassword, setShowPassword] =
-    useState(false);
-
+  const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
-  const [salesExecutive, setSalesExecutive] =
-    useState(null);
+  const [salesExecutive, setSalesExecutive] = useState(null);
 
   /* =========================
      LOAD SESSION + VENDOR
@@ -126,29 +123,21 @@ export default function Vendor() {
       ).split(", ");
 
       setForm({
-        business_name:
-          data.business_name || "",
+        business_name: data.business_name || "",
 
-        category:
-          data.category || "",
+        category: data.category || "",
 
-        owner_name:
-          data.owner_name || "",
+        owner_name: data.owner_name || "",
 
-        mobile_number:
-          data.mobile_number || "",
+        mobile_number: data.mobile_number || "",
 
-        email:
-          data.email || "",
+        email: data.email || "",
 
-        city:
-          addressParts[0] || "",
+        city: addressParts[0] || "",
 
-        address:
-          addressParts.slice(1).join(", "),
+        address: addressParts.slice(1).join(", "),
 
-        upi_id:
-          data.upi_id || "",
+        upi_id: data.upi_id || "",
 
         offer_percentage:
           data.offer_percentage !== null &&
@@ -156,11 +145,9 @@ export default function Vendor() {
             ? String(data.offer_percentage)
             : "",
 
-        password:
-          data.password || "",
+        password: data.password || "",
 
-        confirm_password:
-          data.password || "",
+        confirm_password: data.password || "",
       });
     }
 
@@ -217,11 +204,11 @@ export default function Vendor() {
       "Your Veda Vendor App login credentials are:",
       "",
       `*Mobile Number:* ${form.mobile_number}`,
-      `*Password:* ${form.password}`,
+      `*Passcode:* ${form.password}`,
       "",
-      "Please use your mobile number and password to log in to the Veda Vendor App.",
+      "Please use your mobile number and 4-digit passcode to log in to the Veda Vendor App.",
       "",
-      "For security, please change your password after your first login.",
+      "For security, please keep your passcode safe.",
       "",
       `Sales Executive: ${salesName}`,
       salesMobile
@@ -283,21 +270,25 @@ export default function Vendor() {
     if (!form.password) {
       return showError(
         "Vendor validation error",
-        "Please enter password."
+        "Please enter passcode."
       );
     }
 
     if (!form.confirm_password) {
       return showError(
         "Vendor validation error",
-        "Please confirm the password."
+        "Please confirm the passcode."
       );
     }
 
-    if (form.password.length < 6) {
+    /* =========================
+       PASSCODE VALIDATION
+    ========================= */
+
+    if (!/^\d{4}$/.test(form.password)) {
       return showError(
-        "Invalid password",
-        "Password must be at least 6 characters."
+        "Invalid passcode",
+        "Passcode must be exactly 4 digits."
       );
     }
 
@@ -306,8 +297,8 @@ export default function Vendor() {
       form.confirm_password
     ) {
       return showError(
-        "Password mismatch",
-        "Password and Confirm Password must match."
+        "Passcode mismatch",
+        "Passcode and Confirm Passcode must match."
       );
     }
 
@@ -364,9 +355,7 @@ export default function Vendor() {
         Number(form.offer_percentage);
 
       if (
-        !Number.isFinite(
-          offerPercentage
-        ) ||
+        !Number.isFinite(offerPercentage) ||
         offerPercentage < 0 ||
         offerPercentage > 100
       ) {
@@ -381,6 +370,7 @@ export default function Vendor() {
 
     /* =========================
        PAYLOAD
+       DB COLUMN REMAINS password
     ========================= */
 
     const payload = {
@@ -749,9 +739,11 @@ export default function Vendor() {
                   required={false}
                 />
 
+                {/* ================= PASSCODE ================= */}
+
                 <PasswordBox
-                  label="Password"
-                  placeholder="Enter password"
+                  label="Passcode"
+                  placeholder="Enter 4-digit passcode"
                   name="password"
                   value={form.password}
                   onChange={handleChange}
@@ -762,8 +754,8 @@ export default function Vendor() {
                 />
 
                 <PasswordBox
-                  label="Confirm Password"
-                  placeholder="Confirm password"
+                  label="Confirm Passcode"
+                  placeholder="Confirm 4-digit passcode"
                   name="confirm_password"
                   value={form.confirm_password}
                   onChange={handleChange}
@@ -922,7 +914,7 @@ function InputBox({
 }
 
 /* =========================
-   PASSWORD BOX
+   PASSCODE BOX
 ========================= */
 
 function PasswordBox({
@@ -974,8 +966,23 @@ function PasswordBox({
           }
           name={name}
           value={value}
-          onChange={onChange}
+          onChange={(e) => {
+            const numericValue =
+              e.target.value
+                .replace(/\D/g, "")
+                .slice(0, 4);
+
+            onChange({
+              target: {
+                name,
+                value: numericValue,
+              },
+            });
+          }}
           placeholder={placeholder}
+          maxLength={4}
+          inputMode="numeric"
+          pattern="[0-9]{4}"
           required
           className="
             w-full
