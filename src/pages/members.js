@@ -333,25 +333,34 @@ export default function Members() {
             />
 
             {/* CREATE DATE */}
+<DetailRow
+  icon={<CalendarDays size={15} />}
+  label="Create Date"
+  value={formatDate(
+    selectedMember.created_at
+  )}
+/>
 
-            <DetailRow
-              icon={<CalendarDays size={15} />}
-              label="Create Date"
-              value={formatDate(
-                selectedMember.created_at
-              )}
-            />
+{/* VALID TILL */}
 
-            {/* VALID TILL */}
+<DetailRow
+  icon={<CalendarDays size={15} />}
+  label="Valid Till"
+  value={formatDate(
+    selectedMember.valid_till ||
+      (() => {
+        const createDate = new Date(
+          selectedMember.created_at
+        );
 
-            <DetailRow
-              icon={<CalendarDays size={15} />}
-              label="Valid Till"
-              value={formatDate(
-                selectedMember.valid_till
-              )}
-            />
+        createDate.setFullYear(
+          createDate.getFullYear() + 1
+        );
 
+        return createDate;
+      })()
+  )}
+/>
             {/* SALES EXECUTIVE */}
 
             <DetailRow
@@ -613,35 +622,36 @@ export default function Members() {
 
                     {/* CREATE DATE */}
 
-                    <p
-                      className="
-                        text-[10px]
-                        text-gray-500
-                        mt-1
-                      "
-                    >
-                      Create Date:{" "}
-                      {formatDate(
-                        member.created_at
-                      )}
-                    </p>
+                    <p className="mt-1 text-[10px] text-gray-500">
+  Create Date:{" "}
+  {formatDate(
+    member.create_date ||
+      member.created_at
+  )}
+</p>
 
-                    {/* VALID TILL */}
+{/* VALID TILL */}
 
-                    <p
-                      className="
-                        text-[10px]
-                        text-gray-500
-                        mt-1
-                      "
-                    >
-                      Valid Till:{" "}
-                      {formatDate(
-                        member.valid_till
-                      )}
-                    </p>
+<p className="mt-1 text-[10px] text-gray-500">
+  Valid Till:{" "}
+  {formatDate(
+    member.valid_till ||
+      member.valid_until ||
+      (() => {
+        const createDate = new Date(
+          member.create_date ||
+            member.created_at
+        );
 
-                  </div>
+        createDate.setFullYear(
+          createDate.getFullYear() + 1
+        );
+
+        return createDate;
+      })()
+  )}
+</p>
+</div>
 
                 </button>
 
