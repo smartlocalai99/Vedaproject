@@ -840,7 +840,7 @@ export default function Vendor() {
                   </option>
                   {categories.map((category) => (
                     <option key={category.id} value={category.id}>
-                      {category.id}. {category.name}
+                      {category.name}
                     </option>
                   ))}
                 </SelectBox>
