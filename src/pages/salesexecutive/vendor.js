@@ -30,6 +30,7 @@ export default function Vendor() {
   const [form, setForm] = useState({
     business_name: "",
     category: "",
+    subcategory: "",
     owner_name: "",
     mobile_number: "",
     email: "",
@@ -43,12 +44,110 @@ export default function Vendor() {
 
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] =
+    useState("");
+  const [categoriesLoading, setCategoriesLoading] =
+    useState(true);
+  const [subcategoriesLoading, setSubcategoriesLoading] =
+    useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
   const [salesExecutive, setSalesExecutive] = useState(null);
+
+  const activeCategoryId =
+    selectedCategoryId ||
+    String(
+      categories.find(
+        (category) => category.name === form.category
+      )?.id || ""
+    );
+
+  /* =====================================================
+     LOAD CATEGORY MASTER DATA
+     ===================================================== */
+
+  useEffect(() => {
+    async function loadCategories() {
+      setCategoriesLoading(true);
+
+      const { data, error } = await supabase
+        .from("vendor_categories")
+        .select("*")
+        .order("id", { ascending: true });
+
+      setCategoriesLoading(false);
+
+      if (error) {
+        console.error("VENDOR CATEGORIES LOAD ERROR:", error);
+        showError(
+          "Could not load categories",
+          friendlyError(
+            error,
+            "Vendor categories could not be loaded. Please try again."
+          )
+        );
+        return;
+      }
+
+      setCategories(data || []);
+    }
+
+    loadCategories();
+  }, []);
+
+  /* =====================================================
+     LOAD SUBCATEGORIES FOR THE SELECTED CATEGORY ONLY
+     ===================================================== */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSubcategories() {
+      if (!activeCategoryId) {
+        setSubcategories([]);
+        setSubcategoriesLoading(false);
+        return;
+      }
+
+      setSubcategories([]);
+      setSubcategoriesLoading(true);
+
+      const { data, error } = await supabase
+        .from("vendor_subcategories")
+        .select("*")
+        .eq("category_id", activeCategoryId)
+        .order("id", { ascending: true });
+
+      if (cancelled) return;
+
+      setSubcategoriesLoading(false);
+
+      if (error) {
+        console.error("VENDOR SUBCATEGORIES LOAD ERROR:", error);
+        showError(
+          "Could not load subcategories",
+          friendlyError(
+            error,
+            "Vendor subcategories could not be loaded. Please try again."
+          )
+        );
+        return;
+      }
+
+      setSubcategories(data || []);
+    }
+
+    loadSubcategories();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCategoryId]);
 
   /* =====================================================
      LOAD SESSION + VENDOR
@@ -155,6 +254,9 @@ export default function Vendor() {
         category:
           data.category || "",
 
+        subcategory:
+          data.subcategory || "",
+
         owner_name:
           data.owner_name || "",
 
@@ -200,6 +302,21 @@ export default function Vendor() {
     setForm((prev) => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  const handleCategoryChange = (e) => {
+    const categoryId = e.target.value;
+    const selectedCategory = categories.find(
+      (category) => String(category.id) === categoryId
+    );
+
+    setSelectedCategoryId(categoryId);
+    setSubcategories([]);
+    setForm((prev) => ({
+      ...prev,
+      category: selectedCategory?.name || "",
+      subcategory: "",
     }));
   };
 
@@ -314,6 +431,8 @@ export default function Vendor() {
 
     if (
       !form.business_name.trim() ||
+      !form.category.trim() ||
+      !form.subcategory.trim() ||
       !form.owner_name.trim() ||
       !form.mobile_number.trim()
     ) {
@@ -438,6 +557,9 @@ export default function Vendor() {
 
       category:
         form.category.trim() || null,
+
+      subcategory:
+        form.subcategory.trim() || null,
 
       owner_name:
         form.owner_name.trim(),
@@ -702,16 +824,54 @@ export default function Vendor() {
                   required
                 />
 
-                <InputBox
+                <SelectBox
                   icon={<Store size={12} />}
                   label="Category"
-                  placeholder="Restaurant, Hotel, Shopping..."
-                  type="text"
                   name="category"
-                  value={form.category}
+                  value={activeCategoryId}
+                  onChange={handleCategoryChange}
+                  disabled={categoriesLoading}
+                  required
+                >
+                  <option value="">
+                    {categoriesLoading
+                      ? "Loading categories..."
+                      : "Select category"}
+                  </option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.id}. {category.name}
+                    </option>
+                  ))}
+                </SelectBox>
+
+                <SelectBox
+                  icon={<Store size={12} />}
+                  label="Subcategory"
+                  name="subcategory"
+                  value={form.subcategory}
                   onChange={handleChange}
-                  required={false}
-                />
+                  disabled={
+                    !activeCategoryId || subcategoriesLoading
+                  }
+                  required
+                >
+                  <option value="">
+                    {!activeCategoryId
+                      ? "Select category first"
+                      : subcategoriesLoading
+                      ? "Loading subcategories..."
+                      : "Select subcategory"}
+                  </option>
+                  {subcategories.map((subcategory) => (
+                    <option
+                      key={subcategory.id}
+                      value={subcategory.name}
+                    >
+                      {subcategory.name}
+                    </option>
+                  ))}
+                </SelectBox>
 
                 <InputBox
                   icon={<User size={12} />}
@@ -969,6 +1129,80 @@ function InputBox({
             placeholder:text-gray-400
           "
         />
+
+      </div>
+
+    </div>
+  );
+}
+
+/* =====================================================
+   SELECT BOX
+   ===================================================== */
+
+function SelectBox({
+  icon,
+  label,
+  required,
+  name,
+  value,
+  onChange,
+  disabled,
+  children,
+}) {
+  return (
+    <div>
+
+      <label
+        className="
+          text-[9px]
+          font-semibold
+          text-[#13273c]
+        "
+      >
+        {label}
+      </label>
+
+      <div
+        className="
+          mt-1
+          flex
+          items-center
+          bg-[#fafafa]
+          border
+          border-gray-200
+          rounded-xl
+          px-3
+          h-[40px]
+          focus-within:border-[#13273c]
+        "
+      >
+
+        {icon && (
+          <span className="text-gray-400">
+            {icon}
+          </span>
+        )}
+
+        <select
+          name={name}
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          required={required}
+          className="
+            w-full
+            bg-transparent
+            px-2
+            outline-none
+            text-[10px]
+            text-gray-700
+            disabled:cursor-not-allowed
+            disabled:text-gray-400
+          "
+        >
+          {children}
+        </select>
 
       </div>
 

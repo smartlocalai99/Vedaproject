@@ -1,8 +1,14 @@
 import { useState } from "react";
-import { Eye, EyeOff, Phone, Lock } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Phone,
+  Lock,
+} from "lucide-react";
 import { useRouter } from "next/router";
-import { supabase } from "@/lib/supabase";
 import Image from "next/image";
+
+import { supabase } from "@/lib/supabase";
 import { showError } from "@/lib/alerts";
 
 export default function SalesLogin() {
@@ -17,19 +23,53 @@ export default function SalesLogin() {
 
   const [loading, setLoading] = useState(false);
 
+  /* =========================================================
+     HANDLE INPUT
+  ========================================================= */
+
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   };
+
+  /* =========================================================
+     NORMALIZE MOBILE NUMBER
+  ========================================================= */
+
+  const normalizeMobileNumber = (value) => {
+    const digits = String(value || "").replace(/\D/g, "");
+
+    if (digits.length >= 10) {
+      return digits.slice(-10);
+    }
+
+    return digits;
+  };
+
+  /* =========================================================
+     LOGIN
+  ========================================================= */
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (loading) return;
 
-    const mobileNumber = form.mobileNumber.trim();
-    const password = form.password.trim();
+    if (loading) {
+      return;
+    }
+
+    const mobileNumber = normalizeMobileNumber(
+      form.mobileNumber
+    );
+
+    const password = String(form.password || "").trim();
+
+    /* =======================================================
+       VALIDATION
+    ======================================================= */
 
     if (!mobileNumber || !password) {
       showError(
@@ -39,33 +79,71 @@ export default function SalesLogin() {
       return;
     }
 
+    if (mobileNumber.length !== 10) {
+      showError(
+        "Invalid Mobile Number",
+        "Please enter a valid 10-digit mobile number."
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
+      /* =====================================================
+         FIND SALES EXECUTIVE
+      ===================================================== */
+
       const {
-        data,
-        error: loginError,
+        data: salesData,
+        error: mobileError,
       } = await supabase
         .from("sales_executives")
         .select(
-          "id, employee_id, full_name, email, mobile_number, assigned_area, status, created_at"
+          `
+            id,
+            employee_id,
+            full_name,
+            email,
+            mobile_number,
+            password,
+            assigned_area,
+            status,
+            created_at
+          `
         )
         .eq("mobile_number", mobileNumber)
-        .eq("password", password)
         .maybeSingle();
 
-      if (loginError) {
-        console.error("SALES LOGIN ERROR:", loginError);
+      /* =====================================================
+         SUPABASE ERROR
+      ===================================================== */
+
+      if (mobileError) {
+        console.error(
+          "SALES LOGIN SUPABASE ERROR:",
+          mobileError
+        );
 
         showError(
           "Login Failed",
-          "We could not sign you in. Please try again."
+          mobileError.message ||
+            "Unable to verify your account. Please try again."
         );
 
         return;
       }
 
-      if (!data) {
+      /* =====================================================
+         ACCOUNT NOT FOUND
+      ===================================================== */
+
+      if (!salesData) {
+        console.error(
+          "SALES LOGIN: ACCOUNT NOT FOUND",
+          mobileNumber
+        );
+
         showError(
           "Login Failed",
           "Invalid Mobile Number or password."
@@ -74,43 +152,131 @@ export default function SalesLogin() {
         return;
       }
 
-      if (data.status !== "Active") {
+      /* =====================================================
+         PASSWORD CHECK
+      ===================================================== */
+
+      const storedPassword = String(
+        salesData.password || ""
+      ).trim();
+
+      if (!storedPassword) {
+        console.error(
+          "SALES LOGIN: PASSWORD IS EMPTY IN DATABASE"
+        );
+
         showError(
           "Login Failed",
+          "Your account password is not configured. Please contact the administrator."
+        );
+
+        return;
+      }
+
+      if (storedPassword !== password) {
+        console.error(
+          "SALES LOGIN: PASSWORD DOES NOT MATCH"
+        );
+
+        showError(
+          "Login Failed",
+          "Invalid Mobile Number or password."
+        );
+
+        return;
+      }
+
+      /* =====================================================
+         STATUS CHECK
+      ===================================================== */
+
+      const accountStatus = String(
+        salesData.status || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      if (accountStatus !== "active") {
+        showError(
+          "Account Inactive",
           "Your account is inactive. Please contact the administrator."
         );
 
         return;
       }
 
-      localStorage.setItem(
-        "salesExecutiveSession",
-        JSON.stringify(data)
-      );
+      /* =====================================================
+         CREATE SESSION
+         DO NOT STORE PASSWORD
+      ===================================================== */
 
-      router.push("/salesexecutive/dashboard");
+      const sessionData = {
+        id: salesData.id,
+        employee_id: salesData.employee_id,
+        full_name: salesData.full_name,
+        email: salesData.email,
+        mobile_number: salesData.mobile_number,
+        assigned_area: salesData.assigned_area,
+        status: salesData.status,
+        created_at: salesData.created_at,
+      };
+
+      /* =====================================================
+         SAVE SESSION
+      ===================================================== */
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "salesExecutiveSession",
+          JSON.stringify(sessionData)
+        );
+      }
+
+      /* =====================================================
+         LOGIN SUCCESS
+      ===================================================== */
+
+      await router.replace(
+        "/salesexecutive/dashboard"
+      );
     } catch (error) {
-      console.error("SALES LOGIN EXCEPTION:", error);
+      console.error(
+        "SALES LOGIN EXCEPTION:",
+        error
+      );
 
       showError(
         "Login Failed",
-        "Something went wrong. Please try again."
+        error?.message ||
+          "Something went wrong. Please try again."
       );
     } finally {
       setLoading(false);
     }
   };
 
+  /* =========================================================
+     FORGOT PASSWORD
+  ========================================================= */
+
   const handleForgotPassword = () => {
-    router.push("/salesexecutive/reset-password");
+    router.push(
+      "/salesexecutive/reset-password"
+    );
   };
 
+  /* =========================================================
+     UI
+  ========================================================= */
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4 ">
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7] px-4">
 
-      <div className="bg-white rounded-3xl shadow-lg w-full  p-8">
+      <div className="bg-white rounded-3xl shadow-lg w-full max-w-md p-8">
 
-        {/* LOGO */}
+        {/* ===================================================
+            LOGO
+        =================================================== */}
 
         <div className="text-center mb-8">
 
@@ -137,14 +303,18 @@ export default function SalesLogin() {
 
         </div>
 
-        {/* LOGIN FORM */}
+        {/* ===================================================
+            LOGIN FORM
+        =================================================== */}
 
         <form
           onSubmit={handleLogin}
           className="space-y-5"
         >
 
-          {/* MOBILE NUMBER */}
+          {/* =================================================
+              MOBILE NUMBER
+          ================================================= */}
 
           <div>
 
@@ -174,8 +344,12 @@ export default function SalesLogin() {
                   pr-4
                   py-3
                   outline-none
+                  focus:ring-2
                   focus:ring-orange-200
                 "
+                inputMode="numeric"
+                autoComplete="tel"
+                maxLength={13}
                 required
               />
 
@@ -183,7 +357,9 @@ export default function SalesLogin() {
 
           </div>
 
-          {/* PASSWORD */}
+          {/* =================================================
+              PASSWORD
+          ================================================= */}
 
           <div>
 
@@ -199,7 +375,11 @@ export default function SalesLogin() {
               />
 
               <input
-                type={showPassword ? "text" : "password"}
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
                 name="password"
                 value={form.password}
                 onChange={handleChange}
@@ -213,20 +393,32 @@ export default function SalesLogin() {
                   pr-12
                   py-3
                   outline-none
+                  focus:ring-2
                   focus:ring-orange-200
                 "
+                autoComplete="current-password"
                 required
               />
 
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() =>
+                  setShowPassword(
+                    (previous) => !previous
+                  )
+                }
                 className="
                   absolute
                   right-4
                   top-4
                   text-gray-500
+                  hover:text-gray-700
                 "
+                aria-label={
+                  showPassword
+                    ? "Hide password"
+                    : "Show password"
+                }
               >
                 {showPassword ? (
                   <EyeOff size={20} />
@@ -239,7 +431,9 @@ export default function SalesLogin() {
 
           </div>
 
-          {/* LOGIN BUTTON */}
+          {/* =================================================
+              LOGIN BUTTON
+          ================================================= */}
 
           <button
             type="submit"
@@ -257,12 +451,16 @@ export default function SalesLogin() {
               disabled:cursor-not-allowed
             "
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading
+              ? "Logging in..."
+              : "Login"}
           </button>
 
         </form>
 
-        {/* FORGOT PASSWORD */}
+        {/* ===================================================
+            FORGOT PASSWORD
+        =================================================== */}
 
         <div className="mt-6 text-center">
 
@@ -284,8 +482,3 @@ export default function SalesLogin() {
     </div>
   );
 }
-
-
-
-
-

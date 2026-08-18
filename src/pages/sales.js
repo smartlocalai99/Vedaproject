@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
@@ -29,6 +28,7 @@ import {
   EyeOff,
   Store,
   Users,
+  Pencil,
 } from "lucide-react";
 
 export default function Sales() {
@@ -227,6 +227,24 @@ export default function Sales() {
   };
 
   /* =========================================================
+     OPEN EDIT
+  ========================================================= */
+
+  const openEdit = (item) => {
+    setEditing(item);
+    setCreate(true);
+
+    setTimeout(() => {
+      document
+        .getElementById("create-sales-form")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 100);
+  };
+
+  /* =========================================================
      SEARCH
   ========================================================= */
 
@@ -255,7 +273,7 @@ export default function Sales() {
           behavior: "smooth",
           block: "start",
         });
-    }, 0);
+    }, 100);
   };
 
   /* =========================================================
@@ -331,8 +349,7 @@ export default function Sales() {
               </h2>
 
               <p className="text-xs text-gray-500 mt-1">
-                {selectedSales.employee_id ||
-                  "-"}
+                {selectedSales.employee_id || "-"}
               </p>
 
             </div>
@@ -585,7 +602,7 @@ export default function Sales() {
                   >
                     {item.full_name
                       ?.charAt(0)
-                      ?.toUpperCase()}
+                      ?.toUpperCase() || "S"}
                   </div>
 
                   {/* NAME */}
@@ -609,7 +626,7 @@ export default function Sales() {
                         mt-1
                       "
                     >
-                      {item.employee_id}
+                      {item.employee_id || "-"}
                     </p>
 
                   </div>
@@ -691,8 +708,7 @@ export default function Sales() {
                         font-medium
                       "
                     >
-                      {item.assigned_area ||
-                        "-"}
+                      {item.assigned_area || "-"}
                     </span>
 
                   </div>
@@ -745,22 +761,50 @@ export default function Sales() {
                         text-gray-600
                       "
                     >
-                      {item.mobile_number ||
-                        "-"}
+                      {item.mobile_number || "-"}
                     </span>
 
                   </div>
 
-                  {/* DELETE ONLY */}
+                  {/* EDIT + DELETE */}
 
                   <div
                     className="
                       flex
                       justify-end
                       items-center
-                      mt-3
+                      gap-2
+                      mt-4
                     "
                   >
+
+                    {/* EDIT */}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openEdit(item)
+                      }
+                      className="
+                        flex
+                        items-center
+                        gap-1
+                        border
+                        border-[#172033]
+                        text-[#172033]
+                        rounded
+                        px-3
+                        py-1
+                        text-[10px]
+                        hover:bg-[#172033]
+                        hover:text-white
+                      "
+                    >
+                      <Pencil size={11} />
+                      Edit
+                    </button>
+
+                    {/* DELETE */}
 
                     <button
                       type="button"
@@ -769,10 +813,13 @@ export default function Sales() {
                       }
                       className="
                         border
+                        border-red-200
+                        text-red-500
                         rounded
                         px-3
                         py-1
                         text-[10px]
+                        hover:bg-red-50
                       "
                     >
                       Delete
@@ -821,6 +868,10 @@ export default function Sales() {
 
             let result;
 
+            /* =================================================
+               EDIT EXISTING SALES
+            ================================================= */
+
             if (editing) {
 
               result = await supabase
@@ -831,7 +882,13 @@ export default function Sales() {
                   editing.id
                 );
 
-            } else {
+            }
+
+            /* =================================================
+               CREATE NEW SALES
+            ================================================= */
+
+            else {
 
               result = await supabase
                 .from("sales_executives")
@@ -861,7 +918,9 @@ export default function Sales() {
               return;
             }
 
-            /* EDIT SUCCESS */
+            /* =================================================
+               EDIT SUCCESS
+            ================================================= */
 
             if (editing) {
 
@@ -872,12 +931,14 @@ export default function Sales() {
                 "Sales executive updated successfully"
               );
 
-              loadSales();
+              await loadSales();
 
               return;
             }
 
-            /* CREATE SUCCESS */
+            /* =================================================
+               CREATE SUCCESS
+            ================================================= */
 
             const createdEmployeeId =
               result.data?.employee_id || "";
@@ -932,7 +993,7 @@ export default function Sales() {
             setCreate(false);
             setEditing(null);
 
-            loadSales();
+            await loadSales();
 
             const shareResult =
               await Swal.fire({
@@ -1138,7 +1199,7 @@ function CreateSales({
         form.name.trim(),
 
       mobile_number:
-        form.phone.trim(),
+        cleanPhone,
 
       assigned_area:
         form.area.trim(),
@@ -1185,6 +1246,15 @@ function CreateSales({
             ? "EDIT SALES EXECUTIVE"
             : "CREATE SALES EXECUTIVE"}
         </h2>
+
+        {salesItem && (
+          <p className="text-[10px] text-gray-500 mt-1">
+            Employee ID:{" "}
+            <span className="font-semibold text-[#172033]">
+              {salesItem.employee_id || "-"}
+            </span>
+          </p>
+        )}
 
       </div>
 
