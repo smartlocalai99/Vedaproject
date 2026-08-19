@@ -325,22 +325,28 @@ export default function Vendor() {
 
   useEffect(() => {
     const query = form.location.trim();
+    let cancelled = false;
 
     if (locationSearchTimeout.current) {
       clearTimeout(locationSearchTimeout.current);
     }
 
-    if (query.length < 3) {
+    if (query.length < 3 || hasSelectedLocation) {
+      setLocationLoading(false);
+      setLocationResults([]);
+      setLocationResultsQuery("");
       return;
     }
 
-    locationSearchTimeout.current = setTimeout(async () => {
-      setLocationLoading(true);
-      setLocationSearchError("");
+    setLocationLoading(true);
+    setLocationResults([]);
+    setLocationResultsQuery("");
+    setLocationSearchError("");
 
+    locationSearchTimeout.current = setTimeout(async () => {
       try {
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(query)}`
+          `/api/location/search?q=${encodeURIComponent(query)}`
         );
         const contentType = response.headers.get("content-type") || "";
 
@@ -349,9 +355,13 @@ export default function Vendor() {
         }
 
         const data = await response.json();
-        setLocationResults(Array.isArray(data) ? data : []);
+        if (cancelled) return;
+
+        setLocationResults(Array.isArray(data.results) ? data.results : []);
         setLocationResultsQuery(query);
       } catch (error) {
+        if (cancelled) return;
+
         console.error("LOCATION SEARCH ERROR:", error);
         setLocationResults([]);
         setLocationResultsQuery(query);
@@ -359,11 +369,16 @@ export default function Vendor() {
           "Could not search locations. Please try again."
         );
       } finally {
-        setLocationLoading(false);
+        if (!cancelled) {
+          setLocationLoading(false);
+        }
       }
     }, 500);
 
-    return () => clearTimeout(locationSearchTimeout.current);
+    return () => {
+      cancelled = true;
+      clearTimeout(locationSearchTimeout.current);
+    };
   }, [form.location]);
 
   /* =====================================================
@@ -1105,13 +1120,19 @@ export default function Vendor() {
                   onChange={(value) => {
                     setForm((prev) => ({ ...prev, location: value }));
                     setHasSelectedLocation(false);
-                    setLocationLoading(value.trim().length >= 3);
                     setLocationSearchError("");
                   }}
-                  onSelect={(value) => {
-                    setForm((prev) => ({ ...prev, location: value }));
+                  onSelect={(location) => {
+                    setForm((prev) => ({
+                      ...prev,
+                      location:
+                        location.formatted_address ||
+                        location.display_name ||
+                        "",
+                    }));
                     setHasSelectedLocation(true);
                     setLocationLoading(false);
+                    setShowLocationResults(false);
                   }}
                   error={locationSearchError}
                   results={locationResults}
@@ -1401,7 +1422,7 @@ function LocationAutocomplete({
       : [];
 
   const selectLocation = (location) => {
-    onSelect(location.display_name || "");
+    onSelect(location);
     onOpenChange(false);
   };
 
@@ -1420,7 +1441,7 @@ function LocationAutocomplete({
             onOpenChange(true);
           }}
           onFocus={() => onOpenChange(true)}
-          placeholder="Search location..."
+          placeholder="Search full address/location..."
           autoComplete="off"
           className="w-full bg-transparent px-2 outline-none text-[10px] text-gray-700 placeholder:text-gray-400"
         />
@@ -1445,7 +1466,7 @@ function LocationAutocomplete({
               onClick={() => selectLocation(location)}
               className="block w-full border-b border-gray-100 px-3 py-2 text-left text-[9px] text-gray-700 last:border-b-0 hover:bg-gray-50"
             >
-              {location.display_name}
+              {location.formatted_address || location.display_name}
             </button>
           ))}
         </div>
