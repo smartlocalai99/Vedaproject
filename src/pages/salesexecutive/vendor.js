@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
 import Swal from "sweetalert2";
@@ -23,6 +23,23 @@ import {
   showError,
   showSuccess,
 } from "@/lib/alerts";
+
+const DOCUMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+const DOCUMENT_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+];
+
+const hasAllowedDocumentType = (file) => {
+  if (!file) return false;
+
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  return (
+    DOCUMENT_MIME_TYPES.includes(file.type) ||
+    ["pdf", "jpg", "jpeg", "png"].includes(extension)
+  );
+};
 
 export default function Vendor() {
   const router = useRouter();
@@ -34,8 +51,7 @@ export default function Vendor() {
     owner_name: "",
     mobile_number: "",
     email: "",
-    city: "",
-    address: "",
+    location: "",
     upi_id: "",
     offer_percentage: "",
     password: "",
@@ -58,6 +74,24 @@ export default function Vendor() {
     useState(false);
 
   const [salesExecutive, setSalesExecutive] = useState(null);
+  const [governmentProofFile, setGovernmentProofFile] =
+    useState(null);
+  const [aadhaarFile, setAadhaarFile] = useState(null);
+  const [existingDocuments, setExistingDocuments] = useState({
+    governmentProof: "",
+    aadhaar: "",
+  });
+  const [locationResults, setLocationResults] = useState([]);
+  const [locationResultsQuery, setLocationResultsQuery] =
+    useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [showLocationResults, setShowLocationResults] =
+    useState(false);
+  const [locationSearchError, setLocationSearchError] =
+    useState("");
+  const [hasSelectedLocation, setHasSelectedLocation] =
+    useState(false);
+  const locationSearchTimeout = useRef(null);
 
   const activeCategoryId =
     selectedCategoryId ||
@@ -242,10 +276,10 @@ export default function Vendor() {
       }
 
       setEditingId(data.id);
-
-      const addressParts = (
-        data.address || ""
-      ).split(", ");
+      setExistingDocuments({
+        governmentProof: data.government_proof_path || "",
+        aadhaar: data.aadhaar_path || "",
+      });
 
       setForm({
         business_name:
@@ -266,11 +300,7 @@ export default function Vendor() {
         email:
           data.email || "",
 
-        city:
-          addressParts[0] || "",
-
-        address:
-          addressParts.slice(1).join(", "),
+        location: data.address || "",
 
         upi_id:
           data.upi_id || "",
@@ -287,10 +317,54 @@ export default function Vendor() {
         confirm_password:
           data.password || "",
       });
+      setHasSelectedLocation(Boolean(data.address));
     }
 
     loadVendor();
   }, [router]);
+
+  useEffect(() => {
+    const query = form.location.trim();
+
+    if (locationSearchTimeout.current) {
+      clearTimeout(locationSearchTimeout.current);
+    }
+
+    if (query.length < 3) {
+      return;
+    }
+
+    locationSearchTimeout.current = setTimeout(async () => {
+      setLocationLoading(true);
+      setLocationSearchError("");
+
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&q=${encodeURIComponent(query)}`
+        );
+        const contentType = response.headers.get("content-type") || "";
+
+        if (!response.ok || !contentType.includes("application/json")) {
+          throw new Error("Location search returned an invalid response.");
+        }
+
+        const data = await response.json();
+        setLocationResults(Array.isArray(data) ? data : []);
+        setLocationResultsQuery(query);
+      } catch (error) {
+        console.error("LOCATION SEARCH ERROR:", error);
+        setLocationResults([]);
+        setLocationResultsQuery(query);
+        setLocationSearchError(
+          "Could not search locations. Please try again."
+        );
+      } finally {
+        setLocationLoading(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(locationSearchTimeout.current);
+  }, [form.location]);
 
   /* =====================================================
      HANDLE CHANGE
@@ -385,6 +459,68 @@ export default function Vendor() {
     );
   };
 
+  const handleDocumentChange = (event, setFile) => {
+    const file = event.target.files?.[0] || null;
+
+    if (file && !hasAllowedDocumentType(file)) {
+      event.target.value = "";
+      setFile(null);
+      showError(
+        "Invalid document type",
+        "Please select a PDF, JPG, JPEG, or PNG document."
+      );
+      return;
+    }
+
+    setFile(file);
+  };
+
+  const uploadDocument = async (vendorId, file, documentName) => {
+    if (!file) return null;
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || "file";
+    const timestamp = Date.now();
+    const filename = `${documentName}-${timestamp}.${extension}`;
+    const bucketAttempts = [
+      { bucket: "vendor-documents", path: `${vendorId}/${filename}` },
+      { bucket: "documents", path: `vendor-documents/${vendorId}/${filename}` },
+    ];
+    let lastError;
+
+    for (const attempt of bucketAttempts) {
+      const { error } = await supabase.storage
+        .from(attempt.bucket)
+        .upload(attempt.path, file, {
+          contentType: file.type || undefined,
+          upsert: false,
+        });
+
+      if (!error) {
+        return {
+          bucket: attempt.bucket,
+          path: attempt.path,
+          reference: `${attempt.bucket}/${attempt.path}`,
+        };
+      }
+
+      lastError = error;
+
+      if (!/bucket.*not found|not found.*bucket/i.test(error.message || "")) {
+        break;
+      }
+    }
+
+    throw lastError || new Error("Document upload failed.");
+  };
+
+  const removeUploadedDocuments = async (uploads) => {
+    await Promise.all(
+      uploads.map(({ bucket, path }) =>
+        supabase.storage.from(bucket).remove([path])
+      )
+    );
+  };
+
   /* =====================================================
      SUBMIT
      ===================================================== */
@@ -453,6 +589,27 @@ export default function Vendor() {
       return showError(
         "Vendor validation error",
         "Please confirm the passcode."
+      );
+    }
+
+    if (!form.location.trim() || !hasSelectedLocation) {
+      return showError(
+        "Location required",
+        "Please select a location from the search results."
+      );
+    }
+
+    if (!editingId && !governmentProofFile) {
+      return showError(
+        "Government Proof required",
+        "Please select the vendor's Government Proof document."
+      );
+    }
+
+    if (!editingId && !aadhaarFile) {
+      return showError(
+        "Aadhaar Card required",
+        "Please select the vendor's Aadhaar Card document."
       );
     }
 
@@ -570,12 +727,7 @@ export default function Vendor() {
       email:
         form.email.trim() || null,
 
-      address: [
-        form.city.trim(),
-        form.address.trim(),
-      ]
-        .filter(Boolean)
-        .join(", "),
+      address: form.location.trim(),
 
       upi_id:
         cleanUpiId,
@@ -589,52 +741,94 @@ export default function Vendor() {
       status: "Active",
     };
 
-    let result;
+    let vendorId = editingId;
+    let createdVendor = false;
+    const uploadedDocuments = [];
 
-    /* =====================================================
-       UPDATE
-       ===================================================== */
+    try {
+      if (editingId) {
+        const { error } = await supabase
+          .from("vendors")
+          .update(payload)
+          .eq("id", editingId)
+          .eq("sales_id", session.id);
 
-    if (editingId) {
-      result = await supabase
-        .from("vendors")
-        .update(payload)
-        .eq("id", editingId)
-        .eq("sales_id", session.id);
-    }
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("vendors")
+          .insert(payload)
+          .select("id")
+          .single();
 
-    /* =====================================================
-       INSERT
-       ===================================================== */
+        if (error) throw error;
 
-    else {
-      result = await supabase
-        .from("vendors")
-        .insert(payload);
-    }
+        vendorId = data?.id;
+        createdVendor = true;
 
-    setLoading(false);
+        if (!vendorId) {
+          throw new Error("The new vendor ID was not returned.");
+        }
+      }
 
-    /* =====================================================
-       DATABASE ERROR
-       ===================================================== */
+      const documentUpdates = {};
 
-    if (result.error) {
-      console.error(
-        "VENDOR SAVE ERROR:",
-        result.error
-      );
+      if (governmentProofFile) {
+        const upload = await uploadDocument(
+          vendorId,
+          governmentProofFile,
+          "government-proof"
+        );
+        uploadedDocuments.push(upload);
+        documentUpdates.government_proof_path = upload.reference;
+      }
 
+      if (aadhaarFile) {
+        const upload = await uploadDocument(
+          vendorId,
+          aadhaarFile,
+          "aadhaar"
+        );
+        uploadedDocuments.push(upload);
+        documentUpdates.aadhaar_path = upload.reference;
+      }
+
+      if (Object.keys(documentUpdates).length > 0) {
+        const { error } = await supabase
+          .from("vendors")
+          .update(documentUpdates)
+          .eq("id", vendorId)
+          .eq("sales_id", session.id);
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error("VENDOR SAVE OR DOCUMENT UPLOAD ERROR:", error);
+      await removeUploadedDocuments(uploadedDocuments);
+
+      if (createdVendor && vendorId) {
+        const { error: deleteError } = await supabase
+          .from("vendors")
+          .delete()
+          .eq("id", vendorId)
+          .eq("sales_id", session.id);
+
+        if (deleteError) {
+          console.error("VENDOR CLEANUP ERROR:", deleteError);
+        }
+      }
+
+      setLoading(false);
       return showError(
-        editingId
-          ? "Vendor update failed"
-          : "Vendor creation failed",
+        editingId ? "Vendor update failed" : "Vendor creation failed",
         friendlyError(
-          result.error,
-          "The vendor could not be saved. Please try again."
+          error,
+          "The vendor and documents could not be saved. Please try again."
         )
       );
     }
+
+    setLoading(false);
 
     /* =====================================================
        EDIT SUCCESS
@@ -906,26 +1100,45 @@ export default function Vendor() {
                   required={false}
                 />
 
-                <InputBox
-                  icon={<MapPin size={12} />}
-                  label="City"
-                  placeholder="City"
-                  type="text"
-                  name="city"
-                  value={form.city}
-                  onChange={handleChange}
-                  required={false}
+                <LocationAutocomplete
+                  value={form.location}
+                  onChange={(value) => {
+                    setForm((prev) => ({ ...prev, location: value }));
+                    setHasSelectedLocation(false);
+                    setLocationLoading(value.trim().length >= 3);
+                    setLocationSearchError("");
+                  }}
+                  onSelect={(value) => {
+                    setForm((prev) => ({ ...prev, location: value }));
+                    setHasSelectedLocation(true);
+                    setLocationLoading(false);
+                  }}
+                  error={locationSearchError}
+                  results={locationResults}
+                  resultsQuery={locationResultsQuery}
+                  loading={locationLoading}
+                  open={showLocationResults}
+                  onOpenChange={setShowLocationResults}
                 />
 
-                <InputBox
-                  icon={<MapPin size={14} />}
-                  label="Address"
-                  placeholder="Enter complete address"
-                  type="text"
-                  name="address"
-                  value={form.address}
-                  onChange={handleChange}
-                  required={false}
+                <DocumentBox
+                  label="Government Proof"
+                  file={governmentProofFile}
+                  existingReference={existingDocuments.governmentProof}
+                  onChange={(event) =>
+                    handleDocumentChange(event, setGovernmentProofFile)
+                  }
+                  required={!editingId}
+                />
+
+                <DocumentBox
+                  label="Aadhaar Card"
+                  file={aadhaarFile}
+                  existingReference={existingDocuments.aadhaar}
+                  onChange={(event) =>
+                    handleDocumentChange(event, setAadhaarFile)
+                  }
+                  required={!editingId}
                 />
 
                 {/* UPI ID */}
@@ -1136,6 +1349,111 @@ function InputBox({
   );
 }
 
+function DocumentBox({
+  label,
+  file,
+  existingReference,
+  onChange,
+  required,
+}) {
+  return (
+    <div>
+      <label className="text-[9px] font-semibold text-[#13273c]">
+        {label} {required && <span className="text-red-500">* Required</span>}
+      </label>
+
+      <div className="mt-1 flex items-center bg-[#fafafa] border border-gray-200 rounded-xl px-3 h-[40px] focus-within:border-[#13273c]">
+        <input
+          type="file"
+          accept={DOCUMENT_ACCEPT}
+          onChange={onChange}
+          required={required}
+          className="w-full text-[9px] text-gray-700 file:mr-2 file:border-0 file:bg-transparent file:text-[9px] file:font-semibold file:text-[#13273c]"
+        />
+      </div>
+
+      <p className="mt-1 text-[8px] text-gray-500">
+        {file
+          ? `Selected: ${file.name}`
+          : existingReference
+          ? "Document already uploaded. Choose a file only to replace it."
+          : "PDF, JPG, JPEG, or PNG"}
+      </p>
+    </div>
+  );
+}
+
+function LocationAutocomplete({
+  value,
+  onChange,
+  onSelect,
+  error,
+  results,
+  resultsQuery,
+  loading,
+  open,
+  onOpenChange,
+}) {
+  const visibleResults =
+    value.trim().length >= 3 &&
+    resultsQuery === value.trim()
+      ? results
+      : [];
+
+  const selectLocation = (location) => {
+    onSelect(location.display_name || "");
+    onOpenChange(false);
+  };
+
+  return (
+    <div className="relative">
+      <label className="text-[9px] font-semibold text-[#13273c]">Location</label>
+
+      <div className="mt-1 flex items-center bg-[#fafafa] border border-gray-200 rounded-xl px-3 h-[40px] focus-within:border-[#13273c]">
+        <span className="text-gray-400"><MapPin size={12} /></span>
+        <input
+          type="text"
+          name="location"
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value);
+            onOpenChange(true);
+          }}
+          onFocus={() => onOpenChange(true)}
+          placeholder="Search location..."
+          autoComplete="off"
+          className="w-full bg-transparent px-2 outline-none text-[10px] text-gray-700 placeholder:text-gray-400"
+        />
+      </div>
+
+      {open && value.trim().length >= 3 && (
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+          {loading && (
+            <p className="px-3 py-2 text-[9px] text-gray-500">Searching locations...</p>
+          )}
+          {!loading && error && (
+            <p className="px-3 py-2 text-[9px] text-red-500">{error}</p>
+          )}
+          {!loading && !error && visibleResults.length === 0 && (
+            <p className="px-3 py-2 text-[9px] text-gray-500">No locations found</p>
+          )}
+          {!loading && !error && visibleResults.map((location) => (
+            <button
+              key={location.place_id}
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => selectLocation(location)}
+              className="block w-full border-b border-gray-100 px-3 py-2 text-left text-[9px] text-gray-700 last:border-b-0 hover:bg-gray-50"
+            >
+              {location.display_name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* =====================================================
    SELECT BOX
    ===================================================== */
@@ -1318,3 +1636,10 @@ function PasswordBox({
     </div>
   );
 }
+
+
+
+
+
+
+
