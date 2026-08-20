@@ -10,6 +10,7 @@ import {
   EyeOff,
   CheckCircle,
   CreditCard,
+  Navigation,
 } from "lucide-react";
 
 import { useRouter } from "next/router";
@@ -108,6 +109,9 @@ export default function Vendor() {
 
   const [hasSelectedLocation, setHasSelectedLocation] =
     useState(false);
+
+  const [gpsLocation, setGpsLocation] = useState(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   const locationSearchTimeout = useRef(null);
 
@@ -546,6 +550,75 @@ export default function Vendor() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleCaptureGpsLocation = () => {
+    if (!navigator.geolocation) {
+      showError(
+        "GPS Location Error",
+        "GPS location is not supported by this browser."
+      );
+      return;
+    }
+
+    setGpsLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        setGpsLocation({ latitude, longitude });
+
+        try {
+          const response = await fetch(
+            `/api/location/reverse?lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
+          );
+          const data = await response.json();
+
+          if (!response.ok || !data?.formatted_address) {
+            throw new Error(
+              data?.error || "Could not find an address for this location."
+            );
+          }
+
+          setForm((prev) => ({
+            ...prev,
+            location: data.formatted_address,
+          }));
+          setHasSelectedLocation(true);
+          setLocationSearchError("");
+          setShowLocationResults(false);
+        } catch (error) {
+          setForm((prev) => ({
+            ...prev,
+            location: `Latitude: ${latitude.toFixed(6)}, Longitude: ${longitude.toFixed(6)}`,
+          }));
+          setHasSelectedLocation(true);
+          showError(
+            "Address lookup unavailable",
+            "GPS coordinates were captured, but the address could not be found."
+          );
+        } finally {
+          setGpsLoading(false);
+        }
+      },
+      (error) => {
+        setGpsLoading(false);
+
+        const message =
+          error.code === error.PERMISSION_DENIED
+            ? "Please allow location permission and try again."
+            : "Could not get your current GPS location. Please try again.";
+
+        showError("GPS Location Error", message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
   };
 
   /*
@@ -1058,6 +1131,10 @@ export default function Vendor() {
       address:
         form.location.trim() || null,
 
+      latitude: gpsLocation?.latitude ?? null,
+
+      longitude: gpsLocation?.longitude ?? null,
+
       upi_id:
         cleanUpiId || null,
 
@@ -1539,6 +1616,7 @@ export default function Vendor() {
                     setHasSelectedLocation(
                       false
                     );
+                    setGpsLocation(null);
 
                     setLocationSearchError("");
                   }}
@@ -1557,6 +1635,7 @@ export default function Vendor() {
                     setHasSelectedLocation(
                       true
                     );
+                    setGpsLocation(null);
 
                     setLocationLoading(false);
                     setShowLocationResults(
@@ -1572,6 +1651,11 @@ export default function Vendor() {
                   open={showLocationResults}
                   onOpenChange={
                     setShowLocationResults
+                  }
+                  gpsLocation={gpsLocation}
+                  gpsLoading={gpsLoading}
+                  onCaptureGpsLocation={
+                    handleCaptureGpsLocation
                   }
                 />
 
@@ -1883,6 +1967,9 @@ function LocationAutocomplete({
   loading,
   open,
   onOpenChange,
+  gpsLocation,
+  gpsLoading,
+  onCaptureGpsLocation,
 }) {
   const visibleResults =
     value.trim().length >= 3 &&
@@ -1954,6 +2041,43 @@ function LocationAutocomplete({
           "
         />
       </div>
+
+      <button
+        type="button"
+        onClick={onCaptureGpsLocation}
+        disabled={gpsLoading}
+        title="Capture current GPS location"
+        className="
+          mt-2
+          flex
+          items-center
+          justify-center
+          rounded-lg
+          bg-[#13273c]
+          px-3
+          py-1.5
+          text-[8px]
+          text-white
+          hover:bg-[#1d3b5d]
+          disabled:cursor-not-allowed
+          disabled:opacity-60
+        "
+      >
+        {gpsLoading ? (
+          "Capturing..."
+        ) : (
+          <>
+            <Navigation size={12} />
+            <span className="ml-1">GPS Location</span>
+          </>
+        )}
+      </button>
+
+      {gpsLocation && (
+        <p className="mt-1 text-[8px] text-gray-400">
+          GPS location captured successfully.
+        </p>
+      )}
 
       {open &&
         value.trim().length >= 3 && (
