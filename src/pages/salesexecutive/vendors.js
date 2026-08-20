@@ -6,6 +6,7 @@ import {
   MapPin,
   Phone,
   Search,
+  Pencil,
   Trash2,
 } from "lucide-react";
 
@@ -326,26 +327,47 @@ export default function Vendors() {
 
                     </div>
 
-                    {/* DELETE */}
+                    {/* ACTIONS */}
 
-                    <button
-                      type="button"
-                      aria-label={`Delete ${
-                        vendor.business_name ||
-                        "vendor"
-                      }`}
-                      onClick={() =>
-                        deleteVendor(vendor)
-                      }
-                      className="
-                        rounded-lg
-                        p-2
-                        text-red-500
-                        hover:bg-red-50
-                      "
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label={`Edit ${
+                          vendor.business_name || "vendor"
+                        }`}
+                        onClick={() =>
+                          router.push(
+                            `/salesexecutive/vendor?id=${vendor.id}`
+                          )
+                        }
+                        className="
+                          rounded-lg
+                          p-2
+                          text-[#13273c]
+                          hover:bg-slate-100
+                        "
+                      >
+                        <Pencil size={16} />
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-label={`Delete ${
+                          vendor.business_name || "vendor"
+                        }`}
+                        onClick={() =>
+                          deleteVendor(vendor)
+                        }
+                        className="
+                          rounded-lg
+                          p-2
+                          text-red-500
+                          hover:bg-red-50
+                        "
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
 
                   </div>
 

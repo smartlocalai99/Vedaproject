@@ -6,6 +6,7 @@ import {
   User,
   Phone,
   Search,
+  Pencil,
   Trash2,
 } from "lucide-react";
 
@@ -380,28 +381,53 @@ export default function Members() {
 </p>
 </div>
 
-                  {/* DELETE */}
+                  {/* ACTIONS */}
 
-                  <button
-                    type="button"
-                    aria-label={`Delete ${
-                      member.full_name || "member"
-                    }`}
-                    onClick={() => deleteMember(member)}
-                    className="
-                      flex
-                      h-8
-                      w-8
-                      flex-shrink-0
-                      items-center
-                      justify-center
-                      rounded-lg
-                      text-red-500
-                      hover:bg-red-50
-                    "
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex flex-shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label={`Edit ${
+                        member.full_name || "member"
+                      }`}
+                      onClick={() =>
+                        router.push(
+                          `/salesexecutive/member?id=${member.id}`
+                        )
+                      }
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        items-center
+                        justify-center
+                        rounded-lg
+                        text-[#172033]
+                        hover:bg-gray-100
+                      "
+                    >
+                      <Pencil size={16} />
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label={`Delete ${
+                        member.full_name || "member"
+                      }`}
+                      onClick={() => deleteMember(member)}
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        items-center
+                        justify-center
+                        rounded-lg
+                        text-red-500
+                        hover:bg-red-50
+                      "
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -446,4 +472,3 @@ function EmptyState() {
     </div>
   );
 }
-

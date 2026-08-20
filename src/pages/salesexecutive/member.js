@@ -370,12 +370,15 @@ export default function Member() {
         };
 
         const {
+          data: updatedMember,
           error,
         } = await supabase
           .from("members")
           .update(updatePayload)
           .eq("id", editingId)
-          .eq("sales_id", session.id);
+          .eq("sales_id", session.id)
+          .select("id")
+          .maybeSingle();
 
         if (error) {
           console.error(
@@ -389,6 +392,15 @@ export default function Member() {
               error,
               "The member could not be updated."
             )
+          );
+
+          return;
+        }
+
+        if (!updatedMember) {
+          showError(
+            "Member update failed",
+            "The member could not be updated. Please check your access."
           );
 
           return;
@@ -989,4 +1001,3 @@ function InputBox({
     </div>
   );
 }
-
