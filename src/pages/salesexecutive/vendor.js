@@ -1,3 +1,2242 @@
+// import {
+//   ArrowLeft,
+//   Store,
+//   User,
+//   Phone,
+//   Mail,
+//   MapPin,
+//   Lock,
+//   Eye,
+//   EyeOff,
+//   CheckCircle,
+//   CreditCard,
+// } from "lucide-react";
+
+// import { useRouter } from "next/router";
+// import { useEffect, useRef, useState } from "react";
+// import Footer from "@/components/Footer";
+// import { supabase } from "@/lib/supabase";
+// import Swal from "sweetalert2";
+
+// import {
+//   friendlyError,
+//   showError,
+//   showSuccess,
+// } from "@/lib/alerts";
+
+// const DOCUMENT_ACCEPT =
+//   ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+
+// const DOCUMENT_MIME_TYPES = [
+//   "application/pdf",
+//   "image/jpeg",
+//   "image/png",
+// ];
+
+// const hasAllowedDocumentType = (file) => {
+//   if (!file) return false;
+
+//   const extension =
+//     file.name.split(".").pop()?.toLowerCase() || "";
+
+//   return (
+//     DOCUMENT_MIME_TYPES.includes(file.type) ||
+//     ["pdf", "jpg", "jpeg", "png"].includes(extension)
+//   );
+// };
+
+// export default function Vendor() {
+//   const router = useRouter();
+
+//   const [form, setForm] = useState({
+//     business_name: "",
+//     category: "",
+//     subcategory: "",
+//     owner_name: "",
+//     mobile_number: "",
+//     email: "",
+//     location: "",
+//     upi_id: "",
+//     offer_percentage: "",
+//     password: "",
+//     confirm_password: "",
+//   });
+
+//   const [loading, setLoading] = useState(false);
+//   const [editingId, setEditingId] = useState("");
+
+//   const [categories, setCategories] = useState([]);
+//   const [subcategories, setSubcategories] = useState([]);
+
+//   const [selectedCategoryId, setSelectedCategoryId] =
+//     useState("");
+
+//   const [categoriesLoading, setCategoriesLoading] =
+//     useState(true);
+
+//   const [subcategoriesLoading, setSubcategoriesLoading] =
+//     useState(false);
+
+//   const [showPassword, setShowPassword] = useState(false);
+//   const [showConfirmPassword, setShowConfirmPassword] =
+//     useState(false);
+
+//   const [salesExecutive, setSalesExecutive] = useState(null);
+
+//   const [governmentProofFile, setGovernmentProofFile] =
+//     useState(null);
+
+//   const [aadhaarFile, setAadhaarFile] = useState(null);
+
+//   const [existingDocuments, setExistingDocuments] = useState({
+//     governmentProof: "",
+//     aadhaar: "",
+//   });
+
+//   const [locationResults, setLocationResults] = useState([]);
+//   const [locationResultsQuery, setLocationResultsQuery] =
+//     useState("");
+
+//   const [locationLoading, setLocationLoading] =
+//     useState(false);
+
+//   const [showLocationResults, setShowLocationResults] =
+//     useState(false);
+
+//   const [locationSearchError, setLocationSearchError] =
+//     useState("");
+
+//   const [hasSelectedLocation, setHasSelectedLocation] =
+//     useState(false);
+
+//   const locationSearchTimeout = useRef(null);
+
+//   /*
+//    * =====================================================
+//    * ACTIVE CATEGORY
+//    * =====================================================
+//    */
+
+//   const activeCategoryId =
+//     selectedCategoryId ||
+//     String(
+//       categories.find(
+//         (category) => category.name === form.category
+//       )?.id || ""
+//     );
+
+//   /*
+//    * =====================================================
+//    * LOAD CATEGORIES
+//    * =====================================================
+//    */
+
+//   useEffect(() => {
+//     let cancelled = false;
+
+//     async function loadCategories() {
+//       setCategoriesLoading(true);
+
+//       const { data, error } = await supabase
+//         .from("vendor_categories")
+//         .select("*")
+//         .order("id", { ascending: true });
+
+//       if (cancelled) return;
+
+//       setCategoriesLoading(false);
+
+//       if (error) {
+//         console.error(
+//           "VENDOR CATEGORIES LOAD ERROR:",
+//           error
+//         );
+
+//         showError(
+//           "Could not load categories",
+//           friendlyError(
+//             error,
+//             "Vendor categories could not be loaded. Please try again."
+//           )
+//         );
+
+//         return;
+//       }
+
+//       setCategories(data || []);
+//     }
+
+//     loadCategories();
+
+//     return () => {
+//       cancelled = true;
+//     };
+//   }, []);
+
+//   /*
+//    * =====================================================
+//    * LOAD SUBCATEGORIES
+//    * =====================================================
+//    */
+
+//   useEffect(() => {
+//     let cancelled = false;
+
+//     async function loadSubcategories() {
+//       if (!activeCategoryId) {
+//         setSubcategories([]);
+//         setSubcategoriesLoading(false);
+//         return;
+//       }
+
+//       setSubcategories([]);
+//       setSubcategoriesLoading(true);
+
+//       const { data, error } = await supabase
+//         .from("vendor_subcategories")
+//         .select("*")
+//         .eq("category_id", activeCategoryId)
+//         .order("id", { ascending: true });
+
+//       if (cancelled) return;
+
+//       setSubcategoriesLoading(false);
+
+//       if (error) {
+//         console.error(
+//           "VENDOR SUBCATEGORIES LOAD ERROR:",
+//           error
+//         );
+
+//         showError(
+//           "Could not load subcategories",
+//           friendlyError(
+//             error,
+//             "Vendor subcategories could not be loaded. Please try again."
+//           )
+//         );
+
+//         return;
+//       }
+
+//       setSubcategories(data || []);
+//     }
+
+//     loadSubcategories();
+
+//     return () => {
+//       cancelled = true;
+//     };
+//   }, [activeCategoryId]);
+
+//   /*
+//    * =====================================================
+//    * LOAD SESSION + SALES EXECUTIVE + VENDOR
+//    * =====================================================
+//    */
+
+//   useEffect(() => {
+//     if (!router.isReady) return;
+
+//     const saved = localStorage.getItem(
+//       "salesExecutiveSession"
+//     );
+
+//     if (!saved) {
+//       router.replace("/salesexecutive/login");
+//       return;
+//     }
+
+//     let session;
+
+//     try {
+//       session = JSON.parse(saved);
+//     } catch (error) {
+//       console.error("SESSION PARSE ERROR:", error);
+
+//       localStorage.removeItem(
+//         "salesExecutiveSession"
+//       );
+
+//       router.replace("/salesexecutive/login");
+
+//       return;
+//     }
+
+//     if (!session?.id) {
+//       localStorage.removeItem(
+//         "salesExecutiveSession"
+//       );
+
+//       router.replace("/salesexecutive/login");
+
+//       return;
+//     }
+
+//     /*
+//      * LOAD SALES EXECUTIVE
+//      */
+
+//     async function loadSalesExecutive() {
+//       const { data, error } = await supabase
+//         .from("sales_executives")
+//         .select("*")
+//         .eq("id", session.id)
+//         .maybeSingle();
+
+//       if (error) {
+//         console.error(
+//           "SALES EXECUTIVE LOAD ERROR:",
+//           error
+//         );
+
+//         return;
+//       }
+
+//       if (data) {
+//         setSalesExecutive(data);
+//       }
+//     }
+
+//     loadSalesExecutive();
+
+//     /*
+//      * LOAD VENDOR FOR EDIT
+//      */
+
+//     const vendorId = router.query.id;
+
+//     if (!vendorId) {
+//       setEditingId("");
+//       return;
+//     }
+
+//     async function loadVendor() {
+//       const { data, error } = await supabase
+//         .from("vendors")
+//         .select("*")
+//         .eq("id", vendorId)
+//         .eq("sales_id", session.id)
+//         .maybeSingle();
+
+//       if (error) {
+//         console.error(
+//           "VENDOR LOAD ERROR:",
+//           error
+//         );
+
+//         showError(
+//           "Could not load vendor",
+//           friendlyError(
+//             error,
+//             "This vendor could not be loaded."
+//           )
+//         );
+
+//         return;
+//       }
+
+//       if (!data) {
+//         showError(
+//           "Could not load vendor",
+//           "This vendor is not available."
+//         );
+
+//         return;
+//       }
+
+//       setEditingId(String(data.id));
+
+//       /*
+//        * SET CATEGORY ID
+//        */
+
+//       const category = categories.find(
+//         (item) =>
+//           item.name === data.category
+//       );
+
+//       if (category) {
+//         setSelectedCategoryId(
+//           String(category.id)
+//         );
+//       }
+
+//       /*
+//        * EXISTING DOCUMENTS
+//        */
+
+//       setExistingDocuments({
+//         governmentProof:
+//           data.government_proof_path || "",
+//         aadhaar:
+//           data.aadhaar_path || "",
+//       });
+
+//       /*
+//        * FORM DATA
+//        */
+
+//       setForm({
+//         business_name:
+//           data.business_name || "",
+
+//         category:
+//           data.category || "",
+
+//         subcategory:
+//           data.subcategory || "",
+
+//         owner_name:
+//           data.owner_name || "",
+
+//         mobile_number:
+//           data.mobile_number || "",
+
+//         email:
+//           data.email || "",
+
+//         location:
+//           data.address || "",
+
+//         upi_id:
+//           data.upi_id || "",
+
+//         offer_percentage:
+//           data.offer_percentage !== null &&
+//           data.offer_percentage !== undefined
+//             ? String(data.offer_percentage)
+//             : "",
+
+//         password:
+//           data.password || "",
+
+//         confirm_password:
+//           data.password || "",
+//       });
+
+//       setHasSelectedLocation(
+//         Boolean(data.address)
+//       );
+//     }
+
+//     loadVendor();
+//   }, [
+//     router.isReady,
+//     router.query.id,
+//   ]);
+
+//   /*
+//    * =====================================================
+//    * LOCATION SEARCH
+//    * =====================================================
+//    */
+
+//   useEffect(() => {
+//     const query = form.location.trim();
+
+//     let cancelled = false;
+
+//     if (locationSearchTimeout.current) {
+//       clearTimeout(
+//         locationSearchTimeout.current
+//       );
+//     }
+
+//     if (
+//       query.length < 3 ||
+//       hasSelectedLocation
+//     ) {
+//       setLocationLoading(false);
+//       setLocationResults([]);
+//       setLocationResultsQuery("");
+
+//       return;
+//     }
+
+//     setLocationLoading(true);
+//     setLocationResults([]);
+//     setLocationResultsQuery("");
+//     setLocationSearchError("");
+
+//     locationSearchTimeout.current = setTimeout(
+//       async () => {
+//         try {
+//           const response = await fetch(
+//             `/api/location/search?q=${encodeURIComponent(
+//               query
+//             )}`
+//           );
+
+//           const contentType =
+//             response.headers.get(
+//               "content-type"
+//             ) || "";
+
+//           if (
+//             !response.ok ||
+//             !contentType.includes(
+//               "application/json"
+//             )
+//           ) {
+//             throw new Error(
+//               "Location search returned an invalid response."
+//             );
+//           }
+
+//           const data =
+//             await response.json();
+
+//           if (cancelled) return;
+
+//           setLocationResults(
+//             Array.isArray(data?.results)
+//               ? data.results
+//               : []
+//           );
+
+//           setLocationResultsQuery(query);
+//         } catch (error) {
+//           if (cancelled) return;
+
+//           console.error(
+//             "LOCATION SEARCH ERROR:",
+//             error
+//           );
+
+//           setLocationResults([]);
+//           setLocationResultsQuery(query);
+
+//           setLocationSearchError(
+//             "Could not search locations. Please try again."
+//           );
+//         } finally {
+//           if (!cancelled) {
+//             setLocationLoading(false);
+//           }
+//         }
+//       },
+//       500
+//     );
+
+//     return () => {
+//       cancelled = true;
+
+//       if (locationSearchTimeout.current) {
+//         clearTimeout(
+//           locationSearchTimeout.current
+//         );
+//       }
+//     };
+//   }, [
+//     form.location,
+//     hasSelectedLocation,
+//   ]);
+
+//   /*
+//    * =====================================================
+//    * HANDLE CHANGE
+//    * =====================================================
+//    */
+
+//   const handleChange = (e) => {
+//     const { name, value } = e.target;
+
+//     setForm((prev) => ({
+//       ...prev,
+//       [name]: value,
+//     }));
+//   };
+
+//   /*
+//    * =====================================================
+//    * CATEGORY CHANGE
+//    * =====================================================
+//    */
+
+//   const handleCategoryChange = (e) => {
+//     const categoryId = e.target.value;
+
+//     const selectedCategory =
+//       categories.find(
+//         (category) =>
+//           String(category.id) ===
+//           String(categoryId)
+//       );
+
+//     setSelectedCategoryId(categoryId);
+//     setSubcategories([]);
+
+//     setForm((prev) => ({
+//       ...prev,
+//       category:
+//         selectedCategory?.name || "",
+//       subcategory: "",
+//     }));
+//   };
+
+//   /*
+//    * =====================================================
+//    * SEND WHATSAPP CREDENTIALS
+//    * =====================================================
+//    */
+
+//   const sendVendorCredentials = () => {
+//     const vendorMobile =
+//       String(form.mobile_number || "")
+//         .replace(/\D/g, "");
+
+//     if (!vendorMobile) {
+//       showError(
+//         "Mobile number missing",
+//         "Vendor mobile number is required to send WhatsApp credentials."
+//       );
+
+//       return;
+//     }
+
+//     const whatsappNumber =
+//       vendorMobile.length === 10
+//         ? `91${vendorMobile}`
+//         : vendorMobile;
+
+//     const salesName =
+//       salesExecutive?.full_name ||
+//       "Veda Sales Executive";
+
+//     const salesMobile =
+//       salesExecutive?.mobile_number || "";
+
+//     const message = [
+//       `*Hello ${form.business_name || "Vendor"}*,`,
+//       "",
+//       "Welcome to *Veda Vendor*.",
+//       "",
+//       "Your Veda Vendor App login credentials are:",
+//       "",
+//       `*Mobile Number:* ${form.mobile_number}`,
+//       `*Passcode:* ${form.password}`,
+//       "",
+//       "Please use your mobile number and 4-digit passcode to log in to the Veda Vendor App.",
+//       "",
+//       "For security, please keep your passcode safe.",
+//       "",
+//       `Sales Executive: ${salesName}`,
+//       salesMobile
+//         ? `Contact: ${salesMobile}`
+//         : "",
+//       "",
+//       "Thank you,",
+//       "*Veda Team*",
+//     ]
+//       .filter(Boolean)
+//       .join("\n");
+
+//     const whatsappUrl =
+//       `https://wa.me/${whatsappNumber}` +
+//       `?text=${encodeURIComponent(message)}`;
+
+//     window.open(
+//       whatsappUrl,
+//       "_blank",
+//       "noopener,noreferrer"
+//     );
+//   };
+
+//   /*
+//    * =====================================================
+//    * DOCUMENT CHANGE
+//    * =====================================================
+//    */
+
+//   const handleDocumentChange = (
+//     event,
+//     setFile
+//   ) => {
+//     const file =
+//       event.target.files?.[0] || null;
+
+//     if (
+//       file &&
+//       !hasAllowedDocumentType(file)
+//     ) {
+//       event.target.value = "";
+//       setFile(null);
+
+//       showError(
+//         "Invalid document type",
+//         "Please select a PDF, JPG, JPEG, or PNG document."
+//       );
+
+//       return;
+//     }
+
+//     setFile(file);
+//   };
+
+//   /*
+//    * =====================================================
+//    * UPLOAD DOCUMENT
+//    * =====================================================
+//    */
+
+//   const uploadDocument = async (
+//     vendorId,
+//     file,
+//     documentName
+//   ) => {
+//     if (!file) return null;
+
+//     const extension =
+//       file.name
+//         .split(".")
+//         .pop()
+//         ?.toLowerCase() || "file";
+
+//     const timestamp = Date.now();
+
+//     const filename =
+//       `${documentName}-${timestamp}.${extension}`;
+
+//     const bucketAttempts = [
+//       {
+//         bucket: "vendor-documents",
+//         path: `${vendorId}/${filename}`,
+//       },
+//       {
+//         bucket: "documents",
+//         path: `vendor-documents/${vendorId}/${filename}`,
+//       },
+//     ];
+
+//     let lastError = null;
+
+//     for (const attempt of bucketAttempts) {
+//       const { error } =
+//         await supabase.storage
+//           .from(attempt.bucket)
+//           .upload(
+//             attempt.path,
+//             file,
+//             {
+//               contentType:
+//                 file.type || undefined,
+//               upsert: false,
+//             }
+//           );
+
+//       if (!error) {
+//         return {
+//           bucket: attempt.bucket,
+//           path: attempt.path,
+//           reference:
+//             `${attempt.bucket}/${attempt.path}`,
+//         };
+//       }
+
+//       lastError = error;
+
+//       if (
+//         !/bucket.*not found|not found.*bucket/i.test(
+//           error.message || ""
+//         )
+//       ) {
+//         break;
+//       }
+//     }
+
+//     throw (
+//       lastError ||
+//       new Error(
+//         "Document upload failed."
+//       )
+//     );
+//   };
+
+//   /*
+//    * =====================================================
+//    * REMOVE UPLOADED DOCUMENTS
+//    * =====================================================
+//    */
+
+//   const removeUploadedDocuments =
+//     async (uploads) => {
+//       if (!uploads?.length) return;
+
+//       await Promise.all(
+//         uploads.map(
+//           async ({
+//             bucket,
+//             path,
+//           }) => {
+//             try {
+//               await supabase.storage
+//                 .from(bucket)
+//                 .remove([path]);
+//             } catch (error) {
+//               console.error(
+//                 "DOCUMENT CLEANUP ERROR:",
+//                 error
+//               );
+//             }
+//           }
+//         )
+//       );
+//     };
+
+//   /*
+//    * =====================================================
+//    * SUBMIT
+//    * =====================================================
+//    */
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+
+//     if (loading) return;
+
+//     const saved =
+//       localStorage.getItem(
+//         "salesExecutiveSession"
+//       );
+
+//     if (!saved) {
+//       return showError(
+//         "Vendor creation failed",
+//         "Your session has expired. Please log in again."
+//       );
+//     }
+
+//     let session;
+
+//     try {
+//       session = JSON.parse(saved);
+//     } catch (error) {
+//       console.error(
+//         "SESSION PARSE ERROR:",
+//         error
+//       );
+
+//       localStorage.removeItem(
+//         "salesExecutiveSession"
+//       );
+
+//       return showError(
+//         "Session error",
+//         "Please log in again."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * SESSION ID
+//      * =====================================================
+//      */
+
+//     if (!session?.id) {
+//       return showError(
+//         "Session error",
+//         "Sales Executive ID was not found. Please log in again."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * REQUIRED BASIC FIELDS
+//      * =====================================================
+//      */
+
+//     if (!form.business_name.trim()) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please enter business name."
+//       );
+//     }
+
+//     if (!form.category.trim()) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please select category."
+//       );
+//     }
+
+//     if (!form.subcategory.trim()) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please select subcategory."
+//       );
+//     }
+
+//     if (!form.owner_name.trim()) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please enter owner name."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * PASSCODE VALIDATION
+//      * =====================================================
+//      */
+
+//     if (!form.password) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please enter passcode."
+//       );
+//     }
+
+//     if (!form.confirm_password) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please confirm the passcode."
+//       );
+//     }
+
+//     if (!/^\d{4}$/.test(form.password)) {
+//       return showError(
+//         "Invalid passcode",
+//         "Passcode must be exactly 4 digits."
+//       );
+//     }
+
+//     if (
+//       form.password !==
+//       form.confirm_password
+//     ) {
+//       return showError(
+//         "Passcode mismatch",
+//         "Passcode and Confirm Passcode must match."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * MOBILE VALIDATION
+//      * =====================================================
+//      */
+
+//     const cleanMobile =
+//       String(form.mobile_number || "")
+//         .replace(/\D/g, "");
+
+//     if (!cleanMobile) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please enter vendor mobile number."
+//       );
+//     }
+
+//     if (cleanMobile.length !== 10) {
+//       return showError(
+//         "Invalid mobile number",
+//         "Please enter a valid 10-digit vendor mobile number."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * EMAIL VALIDATION
+//      * =====================================================
+//      */
+
+//     const cleanEmail =
+//       form.email.trim();
+
+//     if (
+//       cleanEmail &&
+//       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+//         cleanEmail
+//       )
+//     ) {
+//       return showError(
+//         "Invalid email",
+//         "Please enter a valid email address."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * UPI VALIDATION
+//      * =====================================================
+//      */
+
+//     const cleanUpiId =
+//       form.upi_id.trim();
+
+//     if (
+//       cleanUpiId &&
+//       !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/.test(
+//         cleanUpiId
+//       )
+//     ) {
+//       return showError(
+//         "Invalid UPI ID",
+//         "Please enter a valid UPI ID, for example vendor@ybl."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * LOCATION VALIDATION
+//      * =====================================================
+//      */
+
+//     if (!form.location.trim()) {
+//       return showError(
+//         "Vendor validation error",
+//         "Please select a location."
+//       );
+//     }
+
+//     if (!hasSelectedLocation) {
+//       return showError(
+//         "Location selection",
+//         "Please select a location from the search results."
+//       );
+//     }
+
+//     /*
+//      * =====================================================
+//      * OFFER VALIDATION
+//      * =====================================================
+//      */
+
+//     let offerPercentage = null;
+
+//     if (
+//       form.offer_percentage !== "" &&
+//       form.offer_percentage !== null
+//     ) {
+//       offerPercentage =
+//         Number(form.offer_percentage);
+
+//       if (
+//         !Number.isFinite(
+//           offerPercentage
+//         ) ||
+//         offerPercentage < 0 ||
+//         offerPercentage > 100
+//       ) {
+//         return showError(
+//           "Invalid offer",
+//           "Offer percentage must be between 0 and 100."
+//         );
+//       }
+//     }
+
+//     /*
+//      * =====================================================
+//      * START SAVING
+//      * =====================================================
+//      */
+
+//     setLoading(true);
+
+//     const payload = {
+//       sales_id: session.id,
+
+//       business_name:
+//         form.business_name.trim() || null,
+
+//       category:
+//         form.category.trim() || null,
+
+//       subcategory:
+//         form.subcategory.trim() || null,
+
+//       owner_name:
+//         form.owner_name.trim() || null,
+
+//       mobile_number:
+//         cleanMobile || null,
+
+//       email:
+//         cleanEmail || null,
+
+//       address:
+//         form.location.trim() || null,
+
+//       upi_id:
+//         cleanUpiId || null,
+
+//       offer_percentage:
+//         offerPercentage,
+
+//       password:
+//         form.password,
+
+//       status: "Active",
+//     };
+
+//     let vendorId = editingId;
+//     let createdVendor = false;
+
+//     const uploadedDocuments = [];
+
+//     try {
+//       /*
+//        * ===================================================
+//        * UPDATE EXISTING VENDOR
+//        * ===================================================
+//        */
+
+//       if (editingId) {
+//         const {
+//           data: updatedVendor,
+//           error,
+//         } = await supabase
+//           .from("vendors")
+//           .update(payload)
+//           .eq("id", editingId)
+//           .eq("sales_id", session.id)
+//           .select("id")
+//           .maybeSingle();
+
+//         if (error) throw error;
+
+//         if (!updatedVendor) {
+//           throw new Error(
+//             "Vendor could not be updated. Please check your access."
+//           );
+//         }
+//       }
+
+//       /*
+//        * ===================================================
+//        * CREATE NEW VENDOR
+//        * ===================================================
+//        */
+
+//       else {
+//         const {
+//           data,
+//           error,
+//         } = await supabase
+//           .from("vendors")
+//           .insert(payload)
+//           .select("id")
+//           .single();
+
+//         if (error) throw error;
+
+//         vendorId = data?.id;
+
+//         createdVendor = true;
+
+//         if (!vendorId) {
+//           throw new Error(
+//             "The new vendor ID was not returned."
+//           );
+//         }
+//       }
+
+//       /*
+//        * ===================================================
+//        * DOCUMENT UPLOADS
+//        * ===================================================
+//        */
+
+//       const documentUpdates = {};
+
+//       if (governmentProofFile) {
+//         const upload =
+//           await uploadDocument(
+//             vendorId,
+//             governmentProofFile,
+//             "government-proof"
+//           );
+
+//         uploadedDocuments.push(upload);
+
+//         documentUpdates.government_proof_path =
+//           upload.reference;
+//       }
+
+//       if (aadhaarFile) {
+//         const upload =
+//           await uploadDocument(
+//             vendorId,
+//             aadhaarFile,
+//             "aadhaar"
+//           );
+
+//         uploadedDocuments.push(upload);
+
+//         documentUpdates.aadhaar_path =
+//           upload.reference;
+//       }
+
+//       /*
+//        * ===================================================
+//        * SAVE DOCUMENT PATHS
+//        * ===================================================
+//        */
+
+//       if (
+//         Object.keys(
+//           documentUpdates
+//         ).length > 0
+//       ) {
+//         const {
+//           data: documentUpdatedVendor,
+//           error,
+//         } = await supabase
+//           .from("vendors")
+//           .update(documentUpdates)
+//           .eq("id", vendorId)
+//           .eq("sales_id", session.id)
+//           .select("id")
+//           .maybeSingle();
+
+//         if (error) throw error;
+
+//         if (!documentUpdatedVendor) {
+//           throw new Error(
+//             "Document information could not be saved."
+//           );
+//         }
+//       }
+//     } catch (error) {
+//       console.error(
+//         "VENDOR SAVE OR DOCUMENT UPLOAD ERROR:",
+//         error
+//       );
+
+//       await removeUploadedDocuments(
+//         uploadedDocuments
+//       );
+
+//       /*
+//        * DELETE NEW VENDOR IF CREATION FAILED
+//        */
+
+//       if (
+//         createdVendor &&
+//         vendorId
+//       ) {
+//         const {
+//           error: deleteError,
+//         } = await supabase
+//           .from("vendors")
+//           .delete()
+//           .eq("id", vendorId)
+//           .eq("sales_id", session.id);
+
+//         if (deleteError) {
+//           console.error(
+//             "VENDOR CLEANUP ERROR:",
+//             deleteError
+//           );
+//         }
+//       }
+
+//       setLoading(false);
+
+//       return showError(
+//         editingId
+//           ? "Vendor update failed"
+//           : "Vendor creation failed",
+//         friendlyError(
+//           error,
+//           "The vendor and documents could not be saved. Please try again."
+//         )
+//       );
+//     }
+
+//     setLoading(false);
+
+//     /*
+//      * =====================================================
+//      * EDIT SUCCESS
+//      * =====================================================
+//      */
+
+//     if (editingId) {
+//       await showSuccess(
+//         "Vendor updated successfully"
+//       );
+
+//       router.replace(
+//         "/salesexecutive/vendors"
+//       );
+
+//       return;
+//     }
+
+//     /*
+//      * =====================================================
+//      * NEW VENDOR SUCCESS
+//      * =====================================================
+//      */
+
+//     const shareResult =
+//       await Swal.fire({
+//         icon: "success",
+
+//         title:
+//           "Vendor registered successfully",
+
+//         text:
+//           "Send the vendor's login credentials through WhatsApp.",
+
+//         showCancelButton: true,
+
+//         confirmButtonText:
+//           "Share on WhatsApp",
+
+//         cancelButtonText:
+//           "Done",
+
+//         confirmButtonColor:
+//           "#13273c",
+
+//         cancelButtonColor:
+//           "#6b7280",
+//       });
+
+//     if (shareResult.isConfirmed) {
+//       sendVendorCredentials();
+//     }
+
+//     router.replace(
+//       "/salesexecutive/vendors"
+//     );
+//   };
+
+//   /*
+//    * =====================================================
+//    * RENDER
+//    * =====================================================
+//    */
+
+//   return (
+//     <div className="min-h-screen bg-[#f7f8fa]">
+//       <main className="pb-20">
+
+//         {/* ================= HEADER ================= */}
+
+//         <div className="bg-white border-b border-gray-100">
+//           <div className="px-5 py-3 flex items-center gap-3">
+
+//             <button
+//               type="button"
+//               onClick={() => router.back()}
+//               className="
+//                 p-1
+//                 rounded-lg
+//                 hover:bg-gray-100
+//               "
+//             >
+//               <ArrowLeft
+//                 size={17}
+//                 className="text-[#13273c]"
+//               />
+//             </button>
+
+//             <div>
+//               <h1
+//                 className="
+//                   text-[14px]
+//                   font-bold
+//                   text-[#13273c]
+//                 "
+//               >
+//                 {editingId
+//                   ? "Edit Vendor"
+//                   : "Vendor Registration"}
+//               </h1>
+
+//               <p
+//                 className="
+//                   text-[9px]
+//                   text-gray-500
+//                 "
+//               >
+//                 {editingId
+//                   ? "Update vendor details"
+//                   : "Add new vendor details"}
+//               </p>
+//             </div>
+
+//           </div>
+//         </div>
+
+//         {/* ================= REGISTRATION CARD ================= */}
+
+//         <div className="px-2 pt-3">
+//           <div
+//             className="
+//               bg-white
+//               rounded-xl
+//               px-3
+//               py-4
+//               shadow-sm
+//             "
+//           >
+
+//             {/* CARD HEADER */}
+
+//             <div
+//               className="
+//                 flex
+//                 items-center
+//                 gap-2
+//                 mb-4
+//               "
+//             >
+//               <div
+//                 className="
+//                   w-8
+//                   h-8
+//                   rounded-full
+//                   bg-orange-500
+//                   flex
+//                   items-center
+//                   justify-center
+//                   text-white
+//                 "
+//               >
+//                 <Store size={17} />
+//               </div>
+
+//               <div>
+//                 <h2
+//                   className="
+//                     text-[12px]
+//                     font-bold
+//                     text-[#13273c]
+//                   "
+//                 >
+//                   {editingId
+//                     ? "Edit Vendor"
+//                     : "Register Vendor"}
+//                 </h2>
+
+//                 <p
+//                   className="
+//                     text-[8px]
+//                     text-gray-500
+//                   "
+//                 >
+//                   Enter vendor information
+//                 </p>
+//               </div>
+//             </div>
+
+//             {/* ================= FORM ================= */}
+
+//             <form onSubmit={handleSubmit}>
+
+//               <div className="grid grid-cols-2 gap-3">
+
+//                 <InputBox
+//                   icon={<Store size={12} />}
+//                   label="Business Name"
+//                   placeholder="Enter business name"
+//                   type="text"
+//                   name="business_name"
+//                   value={form.business_name}
+//                   onChange={handleChange}
+//                 />
+
+//                 <SelectBox
+//                   icon={<Store size={12} />}
+//                   label="Category"
+//                   name="category"
+//                   value={activeCategoryId}
+//                   onChange={handleCategoryChange}
+//                   disabled={categoriesLoading}
+//                 >
+//                   <option value="">
+//                     {categoriesLoading
+//                       ? "Loading categories..."
+//                       : "Select category"}
+//                   </option>
+
+//                   {categories.map(
+//                     (category) => (
+//                       <option
+//                         key={category.id}
+//                         value={category.id}
+//                       >
+//                         {category.name}
+//                       </option>
+//                     )
+//                   )}
+//                 </SelectBox>
+
+//                 <SelectBox
+//                   icon={<Store size={12} />}
+//                   label="Subcategory"
+//                   name="subcategory"
+//                   value={form.subcategory}
+//                   onChange={handleChange}
+//                   disabled={
+//                     !activeCategoryId ||
+//                     subcategoriesLoading
+//                   }
+//                 >
+//                   <option value="">
+//                     {!activeCategoryId
+//                       ? "Select category first"
+//                       : subcategoriesLoading
+//                       ? "Loading subcategories..."
+//                       : "Select subcategory"}
+//                   </option>
+
+//                   {subcategories.map(
+//                     (subcategory) => (
+//                       <option
+//                         key={subcategory.id}
+//                         value={subcategory.name}
+//                       >
+//                         {subcategory.name}
+//                       </option>
+//                     )
+//                   )}
+//                 </SelectBox>
+
+//                 <InputBox
+//                   icon={<User size={12} />}
+//                   label="Owner Name"
+//                   placeholder="Enter owner name"
+//                   type="text"
+//                   name="owner_name"
+//                   value={form.owner_name}
+//                   onChange={handleChange}
+//                 />
+
+//                 <InputBox
+//                   icon={<Phone size={12} />}
+//                   label="Mobile Number"
+//                   placeholder="10-digit mobile number"
+//                   type="tel"
+//                   name="mobile_number"
+//                   value={form.mobile_number}
+//                   onChange={handleChange}
+//                 />
+
+//                 <InputBox
+//                   icon={<Mail size={12} />}
+//                   label="Email Address"
+//                   placeholder="example@gmail.com"
+//                   type="email"
+//                   name="email"
+//                   value={form.email}
+//                   onChange={handleChange}
+//                 />
+
+//                 <LocationAutocomplete
+//                   value={form.location}
+//                   onChange={(value) => {
+//                     setForm((prev) => ({
+//                       ...prev,
+//                       location: value,
+//                     }));
+
+//                     setHasSelectedLocation(
+//                       false
+//                     );
+
+//                     setLocationSearchError("");
+//                   }}
+//                   onSelect={(location) => {
+//                     const selectedAddress =
+//                       location.formatted_address ||
+//                       location.display_name ||
+//                       "";
+
+//                     setForm((prev) => ({
+//                       ...prev,
+//                       location:
+//                         selectedAddress,
+//                     }));
+
+//                     setHasSelectedLocation(
+//                       true
+//                     );
+
+//                     setLocationLoading(false);
+//                     setShowLocationResults(
+//                       false
+//                     );
+//                   }}
+//                   error={locationSearchError}
+//                   results={locationResults}
+//                   resultsQuery={
+//                     locationResultsQuery
+//                   }
+//                   loading={locationLoading}
+//                   open={showLocationResults}
+//                   onOpenChange={
+//                     setShowLocationResults
+//                   }
+//                 />
+
+//                 <DocumentBox
+//                   label="Government Proof"
+//                   file={governmentProofFile}
+//                   existingReference={
+//                     existingDocuments.governmentProof
+//                   }
+//                   onChange={(event) =>
+//                     handleDocumentChange(
+//                       event,
+//                       setGovernmentProofFile
+//                     )
+//                   }
+//                 />
+
+//                 <DocumentBox
+//                   label="Aadhaar Card"
+//                   file={aadhaarFile}
+//                   existingReference={
+//                     existingDocuments.aadhaar
+//                   }
+//                   onChange={(event) =>
+//                     handleDocumentChange(
+//                       event,
+//                       setAadhaarFile
+//                     )
+//                   }
+//                 />
+
+//                 <InputBox
+//                   icon={
+//                     <CreditCard size={12} />
+//                   }
+//                   label="UPI ID"
+//                   placeholder="example@ybl"
+//                   type="text"
+//                   name="upi_id"
+//                   value={form.upi_id}
+//                   onChange={handleChange}
+//                 />
+
+//                 <InputBox
+//                   icon={null}
+//                   label="Offer Percentage"
+//                   placeholder="Enter %"
+//                   type="number"
+//                   name="offer_percentage"
+//                   value={
+//                     form.offer_percentage
+//                   }
+//                   onChange={handleChange}
+//                 />
+
+//                 {/* PASSCODE */}
+
+//                 <PasswordBox
+//                   label="Passcode"
+//                   placeholder="Enter 4-digit passcode"
+//                   name="password"
+//                   value={form.password}
+//                   onChange={handleChange}
+//                   showPassword={
+//                     showPassword
+//                   }
+//                   setShowPassword={
+//                     setShowPassword
+//                   }
+//                 />
+
+//                 {/* CONFIRM PASSCODE */}
+
+//                 <PasswordBox
+//                   label="Confirm Passcode"
+//                   placeholder="Confirm 4-digit passcode"
+//                   name="confirm_password"
+//                   value={
+//                     form.confirm_password
+//                   }
+//                   onChange={handleChange}
+//                   showPassword={
+//                     showConfirmPassword
+//                   }
+//                   setShowPassword={
+//                     setShowConfirmPassword
+//                   }
+//                 />
+
+//               </div>
+
+//               {/* BUTTONS */}
+
+//               <div
+//                 className="
+//                   flex
+//                   justify-end
+//                   gap-2
+//                   pt-5
+//                 "
+//               >
+//                 <button
+//                   type="button"
+//                   onClick={() =>
+//                     router.back()
+//                   }
+//                   className="
+//                     px-4
+//                     py-2.5
+//                     rounded-xl
+//                     border
+//                     border-gray-200
+//                     text-[10px]
+//                     text-gray-600
+//                     hover:bg-gray-100
+//                   "
+//                 >
+//                   Cancel
+//                 </button>
+
+//                 <button
+//                   type="submit"
+//                   disabled={loading}
+//                   className="
+//                     flex
+//                     items-center
+//                     gap-1.5
+//                     px-4
+//                     py-2.5
+//                     rounded-xl
+//                     bg-[#13273c]
+//                     text-white
+//                     text-[10px]
+//                     font-semibold
+//                     shadow
+//                     hover:bg-[#1d3b5d]
+//                     disabled:opacity-60
+//                     disabled:cursor-not-allowed
+//                   "
+//                 >
+//                   <CheckCircle size={12} />
+
+//                   {loading
+//                     ? "Saving..."
+//                     : editingId
+//                     ? "Save Vendor"
+//                     : "Register Vendor"}
+//                 </button>
+//               </div>
+
+//             </form>
+//           </div>
+//         </div>
+//       </main>
+
+//       <Footer />
+//     </div>
+//   );
+// }
+
+// /*
+//  * =====================================================
+//  * INPUT BOX
+//  * =====================================================
+//  */
+
+// function InputBox({
+//   icon,
+//   label,
+//   placeholder,
+//   type = "text",
+//   name,
+//   value,
+//   onChange,
+// }) {
+//   return (
+//     <div>
+//      <label className="text-[9px] font-semibold text-[#13273c]">
+//         {label}
+//       </label>
+
+//       <div
+//         className="
+//           mt-1
+//           flex
+//           items-center
+//           bg-[#fafafa]
+//           border
+//           border-gray-200
+//           rounded-xl
+//           px-3
+//           h-[40px]
+//           focus-within:border-[#13273c]
+//         "
+//       >
+//         {icon && (
+//           <span className="text-gray-400">
+//             {icon}
+//           </span>
+//         )}
+
+//         <input
+//           type={type}
+//           name={name}
+//           value={value}
+//           onChange={onChange}
+//           placeholder={placeholder}
+//           className="
+//             w-full
+//             bg-transparent
+//             px-2
+//             outline-none
+//             text-[10px]
+//             text-gray-700
+//             placeholder:text-gray-400
+//           "
+//         />
+//       </div>
+//     </div>
+//   );
+// }
+
+// /*
+//  * =====================================================
+//  * DOCUMENT BOX
+//  * =====================================================
+//  */
+
+// function DocumentBox({
+//   label,
+//   file,
+//   existingReference,
+//   onChange,
+// }) {
+//   return (
+//     <div>
+//       <label
+//         className="
+//           text-[9px]
+//           font-semibold
+//           text-[#13273c]
+//         "
+//       >
+//         {label}
+//       </label>
+
+//       <div
+//         className="
+//           mt-1
+//           flex
+//           items-center
+//           bg-[#fafafa]
+//           border
+//           border-gray-200
+//           rounded-xl
+//           px-3
+//           h-[40px]
+//           focus-within:border-[#13273c]
+//         "
+//       >
+//         <input
+//           type="file"
+//           accept={DOCUMENT_ACCEPT}
+//           onChange={onChange}
+//           className="
+//             w-full
+//             text-[9px]
+//             text-gray-700
+//             file:mr-2
+//             file:border-0
+//             file:bg-transparent
+//             file:text-[9px]
+//             file:font-semibold
+//             file:text-[#13273c]
+//           "
+//         />
+//       </div>
+
+//       <p
+//         className="
+//           mt-1
+//           text-[8px]
+//           text-gray-500
+//         "
+//       >
+//         {file
+//           ? `Selected: ${file.name}`
+//           : existingReference
+//           ? "Document already uploaded. Choose a file only to replace it."
+//           : "PDF, JPG, JPEG, or PNG"}
+//       </p>
+//     </div>
+//   );
+// }
+
+// /*
+//  * =====================================================
+//  * LOCATION AUTOCOMPLETE
+//  * =====================================================
+//  */
+
+// function LocationAutocomplete({
+//   value,
+//   onChange,
+//   onSelect,
+//   error,
+//   results,
+//   resultsQuery,
+//   loading,
+//   open,
+//   onOpenChange,
+// }) {
+//   const visibleResults =
+//     value.trim().length >= 3 &&
+//     resultsQuery === value.trim()
+//       ? results
+//       : [];
+
+//   const selectLocation = (
+//     location
+//   ) => {
+//     onSelect(location);
+//     onOpenChange(false);
+//   };
+
+//   return (
+//     <div className="relative">
+//       <label
+//         className="
+//           text-[9px]
+//           font-semibold
+//           text-[#13273c]
+//         "
+//       >
+//         Location
+//       </label>
+
+//       <div
+//         className="
+//           mt-1
+//           flex
+//           items-center
+//           bg-[#fafafa]
+//           border
+//           border-gray-200
+//           rounded-xl
+//           px-3
+//           h-[40px]
+//           focus-within:border-[#13273c]
+//         "
+//       >
+//         <span className="text-gray-400">
+//           <MapPin size={12} />
+//         </span>
+
+//         <input
+//           type="text"
+//           name="location"
+//           value={value}
+//           onChange={(event) => {
+//             onChange(
+//               event.target.value
+//             );
+
+//             onOpenChange(true);
+//           }}
+//           onFocus={() =>
+//             onOpenChange(true)
+//           }
+//           placeholder="Search full address/location..."
+//           autoComplete="off"
+//           className="
+//             w-full
+//             bg-transparent
+//             px-2
+//             outline-none
+//             text-[10px]
+//             text-gray-700
+//             placeholder:text-gray-400
+//           "
+//         />
+//       </div>
+
+//       {open &&
+//         value.trim().length >= 3 && (
+//           <div
+//             className="
+//               absolute
+//               z-20
+//               mt-1
+//               w-full
+//               overflow-hidden
+//               rounded-xl
+//               border
+//               border-gray-200
+//               bg-white
+//               shadow-lg
+//             "
+//           >
+//             {loading && (
+//               <p
+//                 className="
+//                   px-3
+//                   py-2
+//                   text-[9px]
+//                   text-gray-500
+//                 "
+//               >
+//                 Searching locations...
+//               </p>
+//             )}
+
+//             {!loading && error && (
+//               <p
+//                 className="
+//                   px-3
+//                   py-2
+//                   text-[9px]
+//                   text-red-500
+//                 "
+//               >
+//                 {error}
+//               </p>
+//             )}
+
+//             {!loading &&
+//               !error &&
+//               visibleResults.length === 0 && (
+//                 <p
+//                   className="
+//                     px-3
+//                     py-2
+//                     text-[9px]
+//                     text-gray-500
+//                   "
+//                 >
+//                   No locations found
+//                 </p>
+//               )}
+
+//             {!loading &&
+//               !error &&
+//               visibleResults.map(
+//                 (location, index) => (
+//                   <button
+//                     key={
+//                       location.place_id ||
+//                       location.id ||
+//                       `${location.display_name}-${index}`
+//                     }
+//                     type="button"
+//                     onMouseDown={(event) =>
+//                       event.preventDefault()
+//                     }
+//                     onClick={() =>
+//                       selectLocation(
+//                         location
+//                       )
+//                     }
+//                     className="
+//                       block
+//                       w-full
+//                       border-b
+//                       border-gray-100
+//                       px-3
+//                       py-2
+//                       text-left
+//                       text-[9px]
+//                       text-gray-700
+//                       last:border-b-0
+//                       hover:bg-gray-50
+//                     "
+//                   >
+//                     {location.formatted_address ||
+//                       location.display_name}
+//                   </button>
+//                 )
+//               )}
+//           </div>
+//         )}
+//     </div>
+//   );
+// }
+
+// /*
+//  * =====================================================
+//  * SELECT BOX
+//  * =====================================================
+//  */
+
+// function SelectBox({
+//   icon,
+//   label,
+//   name,
+//   value,
+//   onChange,
+//   disabled,
+//   children,
+// }) {
+//   return (
+//     <div>
+//       <label
+//         className="
+//           text-[9px]
+//           font-semibold
+//           text-[#13273c]
+//         "
+//       >
+//         {label}
+//       </label>
+
+//       <div
+//         className="
+//           mt-1
+//           flex
+//           items-center
+//           bg-[#fafafa]
+//           border
+//           border-gray-200
+//           rounded-xl
+//           px-3
+//           h-[40px]
+//           focus-within:border-[#13273c]
+//         "
+//       >
+//         {icon && (
+//           <span className="text-gray-400">
+//             {icon}
+//           </span>
+//         )}
+
+//         <select
+//           name={name}
+//           value={value}
+//           onChange={onChange}
+//           disabled={disabled}
+//           className="
+//             w-full
+//             bg-transparent
+//             px-2
+//             outline-none
+//             text-[10px]
+//             text-gray-700
+//             disabled:cursor-not-allowed
+//             disabled:text-gray-400
+//           "
+//         >
+//           {children}
+//         </select>
+//       </div>
+//     </div>
+//   );
+// }
+
+// /*
+//  * =====================================================
+//  * PASSCODE BOX
+//  * =====================================================
+//  */
+
+// function PasswordBox({
+//   label,
+//   placeholder,
+//   name,
+//   value,
+//   onChange,
+//   showPassword,
+//   setShowPassword,
+// }) {
+//   return (
+//     <div>
+//       <label
+//         className="
+//           text-[9px]
+//           font-semibold
+//           text-[#13273c]
+//         "
+//       >
+//         {label}
+//       </label>
+
+//       <div
+//         className="
+//           mt-1
+//           flex
+//           items-center
+//           bg-[#fafafa]
+//           border
+//           border-gray-200
+//           rounded-xl
+//           px-3
+//           h-[40px]
+//           focus-within:border-[#13273c]
+//         "
+//       >
+//         <span className="text-gray-400">
+//           <Lock size={12} />
+//         </span>
+
+//         <input
+//           type={
+//             showPassword
+//               ? "text"
+//               : "password"
+//           }
+//           name={name}
+//           value={value}
+//           onChange={(e) => {
+//             const numericValue =
+//               e.target.value
+//                 .replace(/\D/g, "")
+//                 .slice(0, 4);
+
+//             onChange({
+//               target: {
+//                 name,
+//                 value: numericValue,
+//               },
+//             });
+//           }}
+//           placeholder={placeholder}
+//           maxLength={4}
+//           inputMode="numeric"
+//           pattern="[0-9]{4}"
+//           required
+//           autoComplete={
+//             name === "password"
+//               ? "new-password"
+//               : "new-password"
+//           }
+//           className="w-full bg-transparent px-2 outline-none text-[10px] text-gray-700 placeholder:text-gray-400"
+//         />
+
+//         <button
+//           type="button"
+//           onClick={() =>
+//             setShowPassword(
+//               !showPassword
+//             )
+//           }
+//            className="text-gray-400 flex items-center justify-cente"
+//         >
+//           {showPassword ? (
+//             <EyeOff size={12} />
+//           ) : (
+//             <Eye size={12} />
+//           )}
+//         </button>
+//       </div>
+//     </div>
+//   );
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
 import {
   ArrowLeft,
   Store,
@@ -10,10 +2249,12 @@ import {
   EyeOff,
   CheckCircle,
   CreditCard,
+  Navigation,
 } from "lucide-react";
 
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
+
 import Footer from "@/components/Footer";
 import { supabase } from "@/lib/supabase";
 import Swal from "sweetalert2";
@@ -43,6 +2284,16 @@ const hasAllowedDocumentType = (file) => {
     DOCUMENT_MIME_TYPES.includes(file.type) ||
     ["pdf", "jpg", "jpeg", "png"].includes(extension)
   );
+};
+
+const logSupabaseError = (stage, error) => {
+  console.error(`Vendor creation error at ${stage}:`, {
+    message: error?.message,
+    details: error?.details,
+    hint: error?.hint,
+    code: error?.code,
+    error,
+  });
 };
 
 export default function Vendor() {
@@ -86,14 +2337,18 @@ export default function Vendor() {
   const [governmentProofFile, setGovernmentProofFile] =
     useState(null);
 
-  const [aadhaarFile, setAadhaarFile] = useState(null);
+  const [aadhaarFile, setAadhaarFile] =
+    useState(null);
 
-  const [existingDocuments, setExistingDocuments] = useState({
-    governmentProof: "",
-    aadhaar: "",
-  });
+  const [existingDocuments, setExistingDocuments] =
+    useState({
+      governmentProof: "",
+      aadhaar: "",
+    });
 
-  const [locationResults, setLocationResults] = useState([]);
+  const [locationResults, setLocationResults] =
+    useState([]);
+
   const [locationResultsQuery, setLocationResultsQuery] =
     useState("");
 
@@ -109,6 +2364,15 @@ export default function Vendor() {
   const [hasSelectedLocation, setHasSelectedLocation] =
     useState(false);
 
+  const [gpsLocation, setGpsLocation] =
+    useState(null);
+
+  const [gpsLoading, setGpsLoading] =
+    useState(false);
+
+  const [locationCaptureMethod, setLocationCaptureMethod] =
+    useState("");
+
   const locationSearchTimeout = useRef(null);
 
   /*
@@ -121,7 +2385,8 @@ export default function Vendor() {
     selectedCategoryId ||
     String(
       categories.find(
-        (category) => category.name === form.category
+        (category) =>
+          category.name === form.category
       )?.id || ""
     );
 
@@ -140,7 +2405,9 @@ export default function Vendor() {
       const { data, error } = await supabase
         .from("vendor_categories")
         .select("*")
-        .order("id", { ascending: true });
+        .order("id", {
+          ascending: true,
+        });
 
       if (cancelled) return;
 
@@ -196,7 +2463,9 @@ export default function Vendor() {
         .from("vendor_subcategories")
         .select("*")
         .eq("category_id", activeCategoryId)
-        .order("id", { ascending: true });
+        .order("id", {
+          ascending: true,
+        });
 
       if (cancelled) return;
 
@@ -252,14 +2521,16 @@ export default function Vendor() {
     try {
       session = JSON.parse(saved);
     } catch (error) {
-      console.error("SESSION PARSE ERROR:", error);
+      console.error(
+        "SESSION PARSE ERROR:",
+        error
+      );
 
       localStorage.removeItem(
         "salesExecutiveSession"
       );
 
       router.replace("/salesexecutive/login");
-
       return;
     }
 
@@ -269,7 +2540,6 @@ export default function Vendor() {
       );
 
       router.replace("/salesexecutive/login");
-
       return;
     }
 
@@ -348,19 +2618,19 @@ export default function Vendor() {
       setEditingId(String(data.id));
 
       /*
-       * SET CATEGORY ID
+       * SET CATEGORY FROM DATABASE
        */
 
-      const category = categories.find(
-        (item) =>
-          item.name === data.category
+      setSelectedCategoryId(
+        String(
+          data.category_id ||
+            categories.find(
+              (item) =>
+                item.name === data.category
+            )?.id ||
+            ""
+        )
       );
-
-      if (category) {
-        setSelectedCategoryId(
-          String(category.id)
-        );
-      }
 
       /*
        * EXISTING DOCUMENTS
@@ -418,6 +2688,26 @@ export default function Vendor() {
       setHasSelectedLocation(
         Boolean(data.address)
       );
+
+      setGpsLocation(
+        Number.isFinite(Number(data.latitude)) &&
+        Number.isFinite(Number(data.longitude))
+          ? {
+              latitude: Number(data.latitude),
+              longitude: Number(data.longitude),
+            }
+          : null
+      );
+
+      setLocationCaptureMethod(
+        /^-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?$/.test(
+          data.address || ""
+        ) &&
+        Number.isFinite(Number(data.latitude)) &&
+        Number.isFinite(Number(data.longitude))
+          ? "gps"
+          : "search"
+      );
     }
 
     loadVendor();
@@ -459,8 +2749,8 @@ export default function Vendor() {
     setLocationResultsQuery("");
     setLocationSearchError("");
 
-    locationSearchTimeout.current = setTimeout(
-      async () => {
+    locationSearchTimeout.current =
+      setTimeout(async () => {
         try {
           const response = await fetch(
             `/api/location/search?q=${encodeURIComponent(
@@ -515,9 +2805,7 @@ export default function Vendor() {
             setLocationLoading(false);
           }
         }
-      },
-      500
-    );
+      }, 500);
 
     return () => {
       cancelled = true;
@@ -573,6 +2861,94 @@ export default function Vendor() {
         selectedCategory?.name || "",
       subcategory: "",
     }));
+  };
+
+  const handleCaptureGpsLocation = () => {
+    if (
+      typeof window === "undefined" ||
+      !window.navigator?.geolocation
+    ) {
+      showError(
+        "Location not supported",
+        "Your browser does not support GPS location."
+      );
+      return;
+    }
+
+    setGpsLoading(true);
+    setLocationSearchError("");
+
+    window.navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        try {
+          const response = await fetch(
+            `/api/location/reverse?lat=${encodeURIComponent(
+              latitude
+            )}&lon=${encodeURIComponent(longitude)}`
+          );
+          const contentType = response.headers.get("content-type") || "";
+
+          if (!contentType.includes("application/json")) {
+            throw new Error(
+              "Address lookup returned an invalid response."
+            );
+          }
+
+          const data = await response.json();
+
+          if (!response.ok || !data?.formatted_address) {
+            throw new Error(
+              data?.error ||
+                "Could not find an address for the captured GPS location."
+            );
+          }
+
+          setGpsLocation({ latitude, longitude });
+          setLocationCaptureMethod("gps");
+          setForm((prev) => ({
+            ...prev,
+            location: data.formatted_address,
+          }));
+          setHasSelectedLocation(true);
+          setShowLocationResults(false);
+          setLocationResults([]);
+          setLocationResultsQuery("");
+        } catch (error) {
+          console.error("GPS ADDRESS LOOKUP ERROR:", error);
+          setHasSelectedLocation(false);
+          showError(
+            "Address lookup failed",
+            error.message ||
+              "GPS coordinates were captured, but the full address could not be found."
+          );
+        } finally {
+          setGpsLoading(false);
+        }
+      },
+      (error) => {
+        console.error("GPS LOCATION ERROR:", error);
+        setGpsLoading(false);
+
+        const message =
+          error.code === error.PERMISSION_DENIED
+            ? "Location permission was denied. Please allow location access in your browser."
+            : error.code === error.POSITION_UNAVAILABLE
+            ? "Your current location is unavailable. Please try again."
+            : error.code === error.TIMEOUT
+            ? "Location request timed out. Please try again."
+            : "Could not capture the current GPS location.";
+
+        showError("GPS Location Error", message);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
   };
 
   /*
@@ -698,59 +3074,27 @@ export default function Vendor() {
     const filename =
       `${documentName}-${timestamp}.${extension}`;
 
-    const bucketAttempts = [
-      {
-        bucket: "vendor-documents",
-        path: `${vendorId}/${filename}`,
-      },
-      {
-        bucket: "documents",
-        path: `vendor-documents/${vendorId}/${filename}`,
-      },
-    ];
+    const bucket = "vendor-documents";
+    const path = `${vendorId}/${filename}`;
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, file, {
+        contentType: file.type || undefined,
+        upsert: false,
+      });
 
-    let lastError = null;
-
-    for (const attempt of bucketAttempts) {
-      const { error } =
-        await supabase.storage
-          .from(attempt.bucket)
-          .upload(
-            attempt.path,
-            file,
-            {
-              contentType:
-                file.type || undefined,
-              upsert: false,
-            }
-          );
-
-      if (!error) {
-        return {
-          bucket: attempt.bucket,
-          path: attempt.path,
-          reference:
-            `${attempt.bucket}/${attempt.path}`,
-        };
-      }
-
-      lastError = error;
-
-      if (
-        !/bucket.*not found|not found.*bucket/i.test(
-          error.message || ""
-        )
-      ) {
-        break;
-      }
+    if (error) {
+      logSupabaseError(`Storage upload: ${documentName}`, error);
+      throw error;
     }
 
-    throw (
-      lastError ||
-      new Error(
-        "Document upload failed."
-      )
-    );
+    console.info("Vendor document uploaded:", { bucket, path });
+
+    return {
+      bucket,
+      path,
+      reference: `${bucket}/${path}`,
+    };
   };
 
   /*
@@ -846,7 +3190,9 @@ export default function Vendor() {
      * =====================================================
      */
 
-    if (!form.business_name.trim()) {
+    if (
+      !form.business_name.trim()
+    ) {
       return showError(
         "Vendor validation error",
         "Please enter business name."
@@ -918,8 +3264,11 @@ export default function Vendor() {
      */
 
     const cleanMobile =
-      String(form.mobile_number || "")
-        .replace(/\D/g, "");
+      String(
+        form.mobile_number || ""
+      )
+        .replace(/\D/g, "")
+        .slice(0, 10);
 
     if (!cleanMobile) {
       return showError(
@@ -928,7 +3277,9 @@ export default function Vendor() {
       );
     }
 
-    if (cleanMobile.length !== 10) {
+    if (
+      cleanMobile.length !== 10
+    ) {
       return showError(
         "Invalid mobile number",
         "Please enter a valid 10-digit vendor mobile number."
@@ -993,7 +3344,28 @@ export default function Vendor() {
     if (!hasSelectedLocation) {
       return showError(
         "Location selection",
-        "Please select a location from the search results."
+        "Please select a location from the search results or use GPS Location."
+      );
+    }
+
+    if (!editingId && !gpsLocation) {
+      return showError(
+        "Vendor validation error",
+        "Please select an Andhra Pradesh vendor address or capture GPS coordinates."
+      );
+    }
+
+    if (!editingId && !governmentProofFile) {
+      return showError(
+        "Vendor validation error",
+        "Please upload the government proof."
+      );
+    }
+
+    if (!editingId && !aadhaarFile) {
+      return showError(
+        "Vendor validation error",
+        "Please upload the Aadhaar card."
       );
     }
 
@@ -1010,7 +3382,9 @@ export default function Vendor() {
       form.offer_percentage !== null
     ) {
       offerPercentage =
-        Number(form.offer_percentage);
+        Number(
+          form.offer_percentage
+        );
 
       if (
         !Number.isFinite(
@@ -1035,31 +3409,44 @@ export default function Vendor() {
     setLoading(true);
 
     const payload = {
-      sales_id: session.id,
+      sales_id:
+        session.id,
 
       business_name:
-        form.business_name.trim() || null,
+        form.business_name.trim() ||
+        null,
 
       category:
-        form.category.trim() || null,
+        form.category.trim() ||
+        null,
 
       subcategory:
-        form.subcategory.trim() || null,
+        form.subcategory.trim() ||
+        null,
 
       owner_name:
-        form.owner_name.trim() || null,
+        form.owner_name.trim() ||
+        null,
 
       mobile_number:
-        cleanMobile || null,
+        cleanMobile ||
+        null,
 
       email:
-        cleanEmail || null,
+        cleanEmail ||
+        null,
 
       address:
-        form.location.trim() || null,
+        form.location.trim() ||
+        null,
+
+      latitude: gpsLocation?.latitude ?? null,
+
+      longitude: gpsLocation?.longitude ?? null,
 
       upi_id:
-        cleanUpiId || null,
+        cleanUpiId ||
+        null,
 
       offer_percentage:
         offerPercentage,
@@ -1067,13 +3454,22 @@ export default function Vendor() {
       password:
         form.password,
 
-      status: "Active",
+      status:
+        "Active",
     };
 
-    let vendorId = editingId;
-    let createdVendor = false;
+    let vendorId =
+      editingId;
 
-    const uploadedDocuments = [];
+    let createdVendor =
+      false;
+
+    const uploadedDocuments =
+      [];
+
+    let saveStage = editingId
+      ? "vendor update"
+      : "vendor insert";
 
     try {
       /*
@@ -1084,17 +3480,26 @@ export default function Vendor() {
 
       if (editingId) {
         const {
-          data: updatedVendor,
+          data:
+            updatedVendor,
           error,
         } = await supabase
           .from("vendors")
           .update(payload)
-          .eq("id", editingId)
-          .eq("sales_id", session.id)
+          .eq(
+            "id",
+            editingId
+          )
+          .eq(
+            "sales_id",
+            session.id
+          )
           .select("id")
           .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         if (!updatedVendor) {
           throw new Error(
@@ -1110,6 +3515,27 @@ export default function Vendor() {
        */
 
       else {
+        saveStage = "duplicate vendor check";
+        const { data: existingVendor, error: existingVendorError } =
+          await supabase
+            .from("vendors")
+            .select("id")
+            .eq("sales_id", session.id)
+            .eq("mobile_number", cleanMobile)
+            .maybeSingle();
+
+        if (existingVendorError) {
+          logSupabaseError(saveStage, existingVendorError);
+          throw existingVendorError;
+        }
+
+        if (existingVendor) {
+          throw new Error(
+            "A vendor with this mobile number already exists. Open that vendor to update it instead of registering it again."
+          );
+        }
+
+        saveStage = "vendor insert";
         const {
           data,
           error,
@@ -1119,11 +3545,16 @@ export default function Vendor() {
           .select("id")
           .single();
 
-        if (error) throw error;
+        if (error) {
+          logSupabaseError(saveStage, error);
+          throw error;
+        }
 
-        vendorId = data?.id;
+        vendorId =
+          data?.id;
 
-        createdVendor = true;
+        createdVendor =
+          true;
 
         if (!vendorId) {
           throw new Error(
@@ -1138,9 +3569,13 @@ export default function Vendor() {
        * ===================================================
        */
 
-      const documentUpdates = {};
+      const documentUpdates =
+        {};
 
-      if (governmentProofFile) {
+      if (
+        governmentProofFile
+      ) {
+        saveStage = "government proof upload";
         const upload =
           await uploadDocument(
             vendorId,
@@ -1148,13 +3583,16 @@ export default function Vendor() {
             "government-proof"
           );
 
-        uploadedDocuments.push(upload);
+        uploadedDocuments.push(
+          upload
+        );
 
         documentUpdates.government_proof_path =
           upload.reference;
       }
 
       if (aadhaarFile) {
+        saveStage = "Aadhaar upload";
         const upload =
           await uploadDocument(
             vendorId,
@@ -1162,7 +3600,9 @@ export default function Vendor() {
             "aadhaar"
           );
 
-        uploadedDocuments.push(upload);
+        uploadedDocuments.push(
+          upload
+        );
 
         documentUpdates.aadhaar_path =
           upload.reference;
@@ -1179,30 +3619,42 @@ export default function Vendor() {
           documentUpdates
         ).length > 0
       ) {
+        saveStage = "document path save";
         const {
-          data: documentUpdatedVendor,
+          data:
+            documentUpdatedVendor,
           error,
         } = await supabase
           .from("vendors")
-          .update(documentUpdates)
-          .eq("id", vendorId)
-          .eq("sales_id", session.id)
+          .update(
+            documentUpdates
+          )
+          .eq(
+            "id",
+            vendorId
+          )
+          .eq(
+            "sales_id",
+            session.id
+          )
           .select("id")
           .maybeSingle();
 
-        if (error) throw error;
+        if (error) {
+          logSupabaseError(saveStage, error);
+          throw error;
+        }
 
-        if (!documentUpdatedVendor) {
+        if (
+          !documentUpdatedVendor
+        ) {
           throw new Error(
             "Document information could not be saved."
           );
         }
       }
     } catch (error) {
-      console.error(
-        "VENDOR SAVE OR DOCUMENT UPLOAD ERROR:",
-        error
-      );
+      logSupabaseError(saveStage, error);
 
       await removeUploadedDocuments(
         uploadedDocuments
@@ -1217,18 +3669,22 @@ export default function Vendor() {
         vendorId
       ) {
         const {
-          error: deleteError,
+          error:
+            deleteError,
         } = await supabase
           .from("vendors")
           .delete()
-          .eq("id", vendorId)
-          .eq("sales_id", session.id);
+          .eq(
+            "id",
+            vendorId
+          )
+          .eq(
+            "sales_id",
+            session.id
+          );
 
         if (deleteError) {
-          console.error(
-            "VENDOR CLEANUP ERROR:",
-            deleteError
-          );
+          logSupabaseError("vendor cleanup", deleteError);
         }
       }
 
@@ -1238,10 +3694,10 @@ export default function Vendor() {
         editingId
           ? "Vendor update failed"
           : "Vendor creation failed",
-        friendlyError(
+        `${saveStage}: ${friendlyError(
           error,
           "The vendor and documents could not be saved. Please try again."
-        )
+        )}`
       );
     }
 
@@ -1296,7 +3752,9 @@ export default function Vendor() {
           "#6b7280",
       });
 
-    if (shareResult.isConfirmed) {
+    if (
+      shareResult.isConfirmed
+    ) {
       sendVendorCredentials();
     }
 
@@ -1322,7 +3780,9 @@ export default function Vendor() {
 
             <button
               type="button"
-              onClick={() => router.back()}
+              onClick={() =>
+                router.back()
+              }
               className="
                 p-1
                 rounded-lg
@@ -1427,27 +3887,43 @@ export default function Vendor() {
 
             {/* ================= FORM ================= */}
 
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={handleSubmit}
+            >
 
               <div className="grid grid-cols-2 gap-3">
 
                 <InputBox
-                  icon={<Store size={12} />}
+                  icon={
+                    <Store size={12} />
+                  }
                   label="Business Name"
                   placeholder="Enter business name"
                   type="text"
                   name="business_name"
-                  value={form.business_name}
-                  onChange={handleChange}
+                  value={
+                    form.business_name
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <SelectBox
-                  icon={<Store size={12} />}
+                  icon={
+                    <Store size={12} />
+                  }
                   label="Category"
                   name="category"
-                  value={activeCategoryId}
-                  onChange={handleCategoryChange}
-                  disabled={categoriesLoading}
+                  value={
+                    activeCategoryId
+                  }
+                  onChange={
+                    handleCategoryChange
+                  }
+                  disabled={
+                    categoriesLoading
+                  }
                 >
                   <option value="">
                     {categoriesLoading
@@ -1458,21 +3934,33 @@ export default function Vendor() {
                   {categories.map(
                     (category) => (
                       <option
-                        key={category.id}
-                        value={category.id}
+                        key={
+                          category.id
+                        }
+                        value={
+                          category.id
+                        }
                       >
-                        {category.name}
+                        {
+                          category.name
+                        }
                       </option>
                     )
                   )}
                 </SelectBox>
 
                 <SelectBox
-                  icon={<Store size={12} />}
+                  icon={
+                    <Store size={12} />
+                  }
                   label="Subcategory"
                   name="subcategory"
-                  value={form.subcategory}
-                  onChange={handleChange}
+                  value={
+                    form.subcategory
+                  }
+                  onChange={
+                    handleChange
+                  }
                   disabled={
                     !activeCategoryId ||
                     subcategoriesLoading
@@ -1487,101 +3975,202 @@ export default function Vendor() {
                   </option>
 
                   {subcategories.map(
-                    (subcategory) => (
+                    (
+                      subcategory
+                    ) => (
                       <option
-                        key={subcategory.id}
-                        value={subcategory.name}
+                        key={
+                          subcategory.id
+                        }
+                        value={
+                          subcategory.name
+                        }
                       >
-                        {subcategory.name}
+                        {
+                          subcategory.name
+                        }
                       </option>
                     )
                   )}
                 </SelectBox>
 
                 <InputBox
-                  icon={<User size={12} />}
+                  icon={
+                    <User size={12} />
+                  }
                   label="Owner Name"
                   placeholder="Enter owner name"
                   type="text"
                   name="owner_name"
-                  value={form.owner_name}
-                  onChange={handleChange}
+                  value={
+                    form.owner_name
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
 
                 <InputBox
-                  icon={<Phone size={12} />}
+                  icon={
+                    <Phone size={12} />
+                  }
                   label="Mobile Number"
                   placeholder="10-digit mobile number"
                   type="tel"
                   name="mobile_number"
-                  value={form.mobile_number}
-                  onChange={handleChange}
+                  value={
+                    form.mobile_number
+                  }
+                  onChange={(e) => {
+                    const value =
+                      e.target.value
+                        .replace(
+                          /\D/g,
+                          ""
+                        )
+                        .slice(
+                          0,
+                          10
+                        );
+
+                    setForm(
+                      (prev) => ({
+                        ...prev,
+                        mobile_number:
+                          value,
+                      })
+                    );
+                  }}
                 />
 
                 <InputBox
-                  icon={<Mail size={12} />}
+                  icon={
+                    <Mail size={12} />
+                  }
                   label="Email Address"
                   placeholder="example@gmail.com"
                   type="email"
                   name="email"
-                  value={form.email}
-                  onChange={handleChange}
+                  value={
+                    form.email
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
 
+                {/* ================= LOCATION ================= */}
+
                 <LocationAutocomplete
-                  value={form.location}
-                  onChange={(value) => {
-                    setForm((prev) => ({
-                      ...prev,
-                      location: value,
-                    }));
+                  value={
+                    form.location
+                  }
+                  onChange={(
+                    value
+                  ) => {
+                    setForm(
+                      (prev) => ({
+                        ...prev,
+                        location:
+                          value,
+                      })
+                    );
 
                     setHasSelectedLocation(
                       false
                     );
 
-                    setLocationSearchError("");
+                    setGpsLocation(null);
+                    setLocationCaptureMethod("");
+
+                    setLocationSearchError(
+                      ""
+                    );
                   }}
-                  onSelect={(location) => {
+                  onSelect={(
+                    location
+                  ) => {
                     const selectedAddress =
                       location.formatted_address ||
                       location.display_name ||
                       "";
 
-                    setForm((prev) => ({
-                      ...prev,
-                      location:
-                        selectedAddress,
-                    }));
+                    setForm(
+                      (prev) => ({
+                        ...prev,
+                        location:
+                          selectedAddress,
+                      })
+                    );
 
                     setHasSelectedLocation(
                       true
                     );
 
-                    setLocationLoading(false);
+                    const latitude = Number(location.lat);
+                    const longitude = Number(location.lon);
+
+                    setGpsLocation(
+                      Number.isFinite(latitude) &&
+                      Number.isFinite(longitude)
+                        ? { latitude, longitude }
+                        : null
+                    );
+                    setLocationCaptureMethod("search");
+
+                    setLocationLoading(
+                      false
+                    );
+
                     setShowLocationResults(
                       false
                     );
                   }}
-                  error={locationSearchError}
-                  results={locationResults}
+                  error={
+                    locationSearchError
+                  }
+                  results={
+                    locationResults
+                  }
                   resultsQuery={
                     locationResultsQuery
                   }
-                  loading={locationLoading}
-                  open={showLocationResults}
+                  loading={
+                    locationLoading
+                  }
+                  open={
+                    showLocationResults
+                  }
                   onOpenChange={
                     setShowLocationResults
                   }
+                  gpsLocation={
+                    gpsLocation
+                  }
+                  gpsLoading={
+                    gpsLoading
+                  }
+                  locationCaptureMethod={
+                    locationCaptureMethod
+                  }
+                  onCaptureGpsLocation={
+                    handleCaptureGpsLocation
+                  }
                 />
+
+                {/* ================= GOVERNMENT PROOF ================= */}
 
                 <DocumentBox
                   label="Government Proof"
-                  file={governmentProofFile}
+                  file={
+                    governmentProofFile
+                  }
                   existingReference={
                     existingDocuments.governmentProof
                   }
-                  onChange={(event) =>
+                  onChange={(
+                    event
+                  ) =>
                     handleDocumentChange(
                       event,
                       setGovernmentProofFile
@@ -1589,13 +4178,19 @@ export default function Vendor() {
                   }
                 />
 
+                {/* ================= AADHAAR ================= */}
+
                 <DocumentBox
                   label="Aadhaar Card"
-                  file={aadhaarFile}
+                  file={
+                    aadhaarFile
+                  }
                   existingReference={
                     existingDocuments.aadhaar
                   }
-                  onChange={(event) =>
+                  onChange={(
+                    event
+                  ) =>
                     handleDocumentChange(
                       event,
                       setAadhaarFile
@@ -1603,17 +4198,27 @@ export default function Vendor() {
                   }
                 />
 
+                {/* ================= UPI ================= */}
+
                 <InputBox
                   icon={
-                    <CreditCard size={12} />
+                    <CreditCard
+                      size={12}
+                    />
                   }
                   label="UPI ID"
                   placeholder="example@ybl"
                   type="text"
                   name="upi_id"
-                  value={form.upi_id}
-                  onChange={handleChange}
+                  value={
+                    form.upi_id
+                  }
+                  onChange={
+                    handleChange
+                  }
                 />
+
+                {/* ================= OFFER ================= */}
 
                 <InputBox
                   icon={null}
@@ -1624,17 +4229,23 @@ export default function Vendor() {
                   value={
                     form.offer_percentage
                   }
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                 />
 
-                {/* PASSCODE */}
+                {/* ================= PASSCODE ================= */}
 
                 <PasswordBox
                   label="Passcode"
                   placeholder="Enter 4-digit passcode"
                   name="password"
-                  value={form.password}
-                  onChange={handleChange}
+                  value={
+                    form.password
+                  }
+                  onChange={
+                    handleChange
+                  }
                   showPassword={
                     showPassword
                   }
@@ -1643,7 +4254,7 @@ export default function Vendor() {
                   }
                 />
 
-                {/* CONFIRM PASSCODE */}
+                {/* ================= CONFIRM PASSCODE ================= */}
 
                 <PasswordBox
                   label="Confirm Passcode"
@@ -1652,7 +4263,9 @@ export default function Vendor() {
                   value={
                     form.confirm_password
                   }
-                  onChange={handleChange}
+                  onChange={
+                    handleChange
+                  }
                   showPassword={
                     showConfirmPassword
                   }
@@ -1663,7 +4276,7 @@ export default function Vendor() {
 
               </div>
 
-              {/* BUTTONS */}
+              {/* ================= BUTTONS ================= */}
 
               <div
                 className="
@@ -1673,6 +4286,7 @@ export default function Vendor() {
                   pt-5
                 "
               >
+
                 <button
                   type="button"
                   onClick={() =>
@@ -1694,7 +4308,9 @@ export default function Vendor() {
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={
+                    loading || gpsLoading
+                  }
                   className="
                     flex
                     items-center
@@ -1712,7 +4328,9 @@ export default function Vendor() {
                     disabled:cursor-not-allowed
                   "
                 >
-                  <CheckCircle size={12} />
+                  <CheckCircle
+                    size={12}
+                  />
 
                   {loading
                     ? "Saving..."
@@ -1720,6 +4338,7 @@ export default function Vendor() {
                     ? "Save Vendor"
                     : "Register Vendor"}
                 </button>
+
               </div>
 
             </form>
@@ -1749,7 +4368,13 @@ function InputBox({
 }) {
   return (
     <div>
-     <label className="text-[9px] font-semibold text-[#13273c]">
+      <label
+        className="
+          text-[9px]
+          font-semibold
+          text-[#13273c]
+        "
+      >
         {label}
       </label>
 
@@ -1834,7 +4459,9 @@ function DocumentBox({
       >
         <input
           type="file"
-          accept={DOCUMENT_ACCEPT}
+          accept={
+            DOCUMENT_ACCEPT
+          }
           onChange={onChange}
           className="
             w-full
@@ -1883,10 +4510,15 @@ function LocationAutocomplete({
   loading,
   open,
   onOpenChange,
+  gpsLocation,
+  gpsLoading,
+  locationCaptureMethod,
+  onCaptureGpsLocation,
 }) {
   const visibleResults =
     value.trim().length >= 3 &&
-    resultsQuery === value.trim()
+    resultsQuery ===
+      value.trim()
       ? results
       : [];
 
@@ -1906,7 +4538,7 @@ function LocationAutocomplete({
           text-[#13273c]
         "
       >
-        Location
+        Vendor Address
       </label>
 
       <div
@@ -1931,7 +4563,9 @@ function LocationAutocomplete({
           type="text"
           name="location"
           value={value}
-          onChange={(event) => {
+          onChange={(
+            event
+          ) => {
             onChange(
               event.target.value
             );
@@ -1941,7 +4575,7 @@ function LocationAutocomplete({
           onFocus={() =>
             onOpenChange(true)
           }
-          placeholder="Search full address/location..."
+          placeholder="Search Andhra Pradesh vendor address..."
           autoComplete="off"
           className="
             w-full
@@ -1953,7 +4587,57 @@ function LocationAutocomplete({
             placeholder:text-gray-400
           "
         />
+
+        <button
+          type="button"
+          onClick={onCaptureGpsLocation}
+          disabled={gpsLoading}
+          title="Capture GPS coordinates only"
+          className="
+            flex
+            shrink-0
+            items-center
+            justify-center
+            rounded-lg
+            bg-[#13273c]
+            px-2
+            py-1.5
+            text-[8px]
+            text-white
+            hover:bg-[#1d3b5d]
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          "
+        >
+          {gpsLoading ? (
+            "Capturing..."
+          ) : (
+            <>
+              <Navigation size={12} />
+              <span className="ml-1 whitespace-nowrap">
+                GPS Location
+              </span>
+            </>
+          )}
+        </button>
+
       </div>
+
+      <p
+        className="
+          mt-1
+          text-[8px]
+          text-gray-400
+        "
+      >
+        {gpsLocation && locationCaptureMethod === "gps"
+          ? `GPS location captured successfully. Latitude: ${gpsLocation.latitude.toFixed(6)}, Longitude: ${gpsLocation.longitude.toFixed(6)}`
+          : gpsLocation
+          ? `Vendor address selected. Latitude: ${gpsLocation.latitude.toFixed(6)}, Longitude: ${gpsLocation.longitude.toFixed(6)}`
+          : "Search and select the vendor's Andhra Pradesh address."}
+      </p>
+
+      {/* SEARCH RESULTS */}
 
       {open &&
         value.trim().length >= 3 && (
@@ -1984,22 +4668,24 @@ function LocationAutocomplete({
               </p>
             )}
 
-            {!loading && error && (
-              <p
-                className="
-                  px-3
-                  py-2
-                  text-[9px]
-                  text-red-500
-                "
-              >
-                {error}
-              </p>
-            )}
+            {!loading &&
+              error && (
+                <p
+                  className="
+                    px-3
+                    py-2
+                    text-[9px]
+                    text-red-500
+                  "
+                >
+                  {error}
+                </p>
+              )}
 
             {!loading &&
               !error &&
-              visibleResults.length === 0 && (
+              visibleResults.length ===
+                0 && (
                 <p
                   className="
                     px-3
@@ -2015,7 +4701,10 @@ function LocationAutocomplete({
             {!loading &&
               !error &&
               visibleResults.map(
-                (location, index) => (
+                (
+                  location,
+                  index
+                ) => (
                   <button
                     key={
                       location.place_id ||
@@ -2023,7 +4712,9 @@ function LocationAutocomplete({
                       `${location.display_name}-${index}`
                     }
                     type="button"
-                    onMouseDown={(event) =>
+                    onMouseDown={(
+                      event
+                    ) =>
                       event.preventDefault()
                     }
                     onClick={() =>
@@ -2188,7 +4879,8 @@ function PasswordBox({
             onChange({
               target: {
                 name,
-                value: numericValue,
+                value:
+                  numericValue,
               },
             });
           }}
@@ -2197,12 +4889,16 @@ function PasswordBox({
           inputMode="numeric"
           pattern="[0-9]{4}"
           required
-          autoComplete={
-            name === "password"
-              ? "new-password"
-              : "new-password"
-          }
-          className="w-full bg-transparent px-2 outline-none text-[10px] text-gray-700 placeholder:text-gray-400"
+          autoComplete="new-password"
+          className="
+            w-full
+            bg-transparent
+            px-2
+            outline-none
+            text-[10px]
+            text-gray-700
+            placeholder:text-gray-400
+          "
         />
 
         <button
@@ -2212,7 +4908,12 @@ function PasswordBox({
               !showPassword
             )
           }
-           className="text-gray-400 flex items-center justify-cente"
+          className="
+            text-gray-400
+            flex
+            items-center
+            justify-center
+          "
         >
           {showPassword ? (
             <EyeOff size={12} />

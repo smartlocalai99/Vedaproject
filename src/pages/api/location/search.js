@@ -1,4 +1,4 @@
-const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
+const PHOTON_SEARCH_URL = "https://photon.komoot.io/api/";
 const ADDRESS_PARTS = [
   "house_number",
   "road",
@@ -81,31 +81,95 @@ const scoreLocation = (location, query) => {
 };
 
 const isUsefulResult = (locations, query) =>
-  locations.some((location) => scoreLocation(location, query) >= 130);
+  locations.some(
+    (location) =>
+      isAndhraPradeshLocation(location) &&
+      scoreLocation(location, query) >= 130
+  );
 
-async function searchNominatim(query) {
+const isAndhraPradeshLocation = (location) =>
+  /andhra pradesh/i.test(location?.address?.state || "");
+
+async function searchPhoton(query) {
   const params = new URLSearchParams({
-    format: "jsonv2",
-    addressdetails: "1",
-    namedetails: "1",
     limit: "8",
-    countrycodes: "in",
-    q: query,
+    lang: "en",
+    q: `${query}, Andhra Pradesh, India`,
   });
-  const response = await fetch(`${NOMINATIM_SEARCH_URL}?${params}`, {
+
+  const response = await fetch(`${PHOTON_SEARCH_URL}?${params}`, {
     headers: {
       Accept: "application/json",
-      "User-Agent": "Veda Vendor Registration Location Search",
     },
   });
   const contentType = response.headers.get("content-type") || "";
 
   if (!response.ok || !contentType.includes("application/json")) {
-    throw new Error("Location search returned an invalid response.");
+    throw new Error(
+      `Address search service failed (status ${response.status || "unknown"}).`
+    );
   }
 
   const data = await response.json();
-  return Array.isArray(data) ? data.filter((location) => location?.place_id) : [];
+  const features = Array.isArray(data?.features) ? data.features : [];
+
+  return features
+    .map((feature) => {
+      const properties = feature?.properties || {};
+      const [longitude, latitude] = feature?.geometry?.coordinates || [];
+      const address = {
+        house_number: properties.housenumber,
+        road: properties.street,
+        neighbourhood: properties.district,
+        suburb: properties.locality,
+        village: properties.village,
+        town: properties.town,
+        city: properties.city,
+        municipality: properties.city,
+        county: properties.county,
+        state: properties.state,
+        postcode: properties.postcode,
+        country: properties.country,
+      };
+      const displayName = [
+        properties.name,
+        properties.street,
+        properties.locality,
+        properties.district,
+        properties.city || properties.town || properties.village,
+        properties.county,
+        properties.state,
+        properties.postcode,
+        properties.country,
+      ]
+        .filter(Boolean)
+        .filter(
+          (part, index, parts) =>
+            parts.findIndex(
+              (candidate) =>
+                normaliseForComparison(candidate) ===
+                normaliseForComparison(part)
+            ) === index
+        )
+        .join(", ");
+
+      return {
+        place_id: `${properties.osm_type || "place"}-${properties.osm_id || displayName}`,
+        display_name: displayName,
+        name: properties.name,
+        address,
+        lat: String(latitude || ""),
+        lon: String(longitude || ""),
+      };
+    })
+    .filter(
+      (location) =>
+        location.place_id &&
+        location.display_name &&
+        Number.isFinite(Number(location.lat)) &&
+        Number.isFinite(Number(location.lon)) &&
+        isAndhraPradeshLocation(location)
+    );
 }
 
 export default async function handler(req, res) {
@@ -125,11 +189,11 @@ export default async function handler(req, res) {
 
   try {
     const variants = queryVariants(query);
-    let locations = await searchNominatim(variants[0]);
+    let locations = await searchPhoton(variants[0]);
 
     if (!isUsefulResult(locations, query)) {
       for (const variant of variants.slice(1)) {
-        const fallbackResults = await searchNominatim(variant);
+        const fallbackResults = await searchPhoton(variant);
         locations = [...locations, ...fallbackResults];
 
         if (isUsefulResult(locations, query)) break;
@@ -166,7 +230,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ results });
   } catch (error) {
-    console.error("NOMINATIM LOCATION SEARCH ERROR:", error);
+    console.error("ADDRESS SEARCH ERROR:", error);
     return res.status(502).json({
       results: [],
       error: "Could not search locations. Please try again.",
