@@ -24,7 +24,9 @@ import {
   showSuccess,
 } from "@/lib/alerts";
 
-const DOCUMENT_ACCEPT = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+const DOCUMENT_ACCEPT =
+  ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+
 const DOCUMENT_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
@@ -34,7 +36,9 @@ const DOCUMENT_MIME_TYPES = [
 const hasAllowedDocumentType = (file) => {
   if (!file) return false;
 
-  const extension = file.name.split(".").pop()?.toLowerCase();
+  const extension =
+    file.name.split(".").pop()?.toLowerCase() || "";
+
   return (
     DOCUMENT_MIME_TYPES.includes(file.type) ||
     ["pdf", "jpg", "jpeg", "png"].includes(extension)
@@ -60,12 +64,16 @@ export default function Vendor() {
 
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState("");
+
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
+
   const [selectedCategoryId, setSelectedCategoryId] =
     useState("");
+
   const [categoriesLoading, setCategoriesLoading] =
     useState(true);
+
   const [subcategoriesLoading, setSubcategoriesLoading] =
     useState(false);
 
@@ -74,24 +82,40 @@ export default function Vendor() {
     useState(false);
 
   const [salesExecutive, setSalesExecutive] = useState(null);
+
   const [governmentProofFile, setGovernmentProofFile] =
     useState(null);
+
   const [aadhaarFile, setAadhaarFile] = useState(null);
+
   const [existingDocuments, setExistingDocuments] = useState({
     governmentProof: "",
     aadhaar: "",
   });
+
   const [locationResults, setLocationResults] = useState([]);
   const [locationResultsQuery, setLocationResultsQuery] =
     useState("");
-  const [locationLoading, setLocationLoading] = useState(false);
+
+  const [locationLoading, setLocationLoading] =
+    useState(false);
+
   const [showLocationResults, setShowLocationResults] =
     useState(false);
+
   const [locationSearchError, setLocationSearchError] =
     useState("");
+
   const [hasSelectedLocation, setHasSelectedLocation] =
     useState(false);
+
   const locationSearchTimeout = useRef(null);
+
+  /*
+   * =====================================================
+   * ACTIVE CATEGORY
+   * =====================================================
+   */
 
   const activeCategoryId =
     selectedCategoryId ||
@@ -101,11 +125,15 @@ export default function Vendor() {
       )?.id || ""
     );
 
-  /* =====================================================
-     LOAD CATEGORY MASTER DATA
-     ===================================================== */
+  /*
+   * =====================================================
+   * LOAD CATEGORIES
+   * =====================================================
+   */
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadCategories() {
       setCategoriesLoading(true);
 
@@ -114,10 +142,16 @@ export default function Vendor() {
         .select("*")
         .order("id", { ascending: true });
 
+      if (cancelled) return;
+
       setCategoriesLoading(false);
 
       if (error) {
-        console.error("VENDOR CATEGORIES LOAD ERROR:", error);
+        console.error(
+          "VENDOR CATEGORIES LOAD ERROR:",
+          error
+        );
+
         showError(
           "Could not load categories",
           friendlyError(
@@ -125,6 +159,7 @@ export default function Vendor() {
             "Vendor categories could not be loaded. Please try again."
           )
         );
+
         return;
       }
 
@@ -132,11 +167,17 @@ export default function Vendor() {
     }
 
     loadCategories();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  /* =====================================================
-     LOAD SUBCATEGORIES FOR THE SELECTED CATEGORY ONLY
-     ===================================================== */
+  /*
+   * =====================================================
+   * LOAD SUBCATEGORIES
+   * =====================================================
+   */
 
   useEffect(() => {
     let cancelled = false;
@@ -162,7 +203,11 @@ export default function Vendor() {
       setSubcategoriesLoading(false);
 
       if (error) {
-        console.error("VENDOR SUBCATEGORIES LOAD ERROR:", error);
+        console.error(
+          "VENDOR SUBCATEGORIES LOAD ERROR:",
+          error
+        );
+
         showError(
           "Could not load subcategories",
           friendlyError(
@@ -170,6 +215,7 @@ export default function Vendor() {
             "Vendor subcategories could not be loaded. Please try again."
           )
         );
+
         return;
       }
 
@@ -183,11 +229,15 @@ export default function Vendor() {
     };
   }, [activeCategoryId]);
 
-  /* =====================================================
-     LOAD SESSION + VENDOR
-     ===================================================== */
+  /*
+   * =====================================================
+   * LOAD SESSION + SALES EXECUTIVE + VENDOR
+   * =====================================================
+   */
 
   useEffect(() => {
+    if (!router.isReady) return;
+
     const saved = localStorage.getItem(
       "salesExecutiveSession"
     );
@@ -203,14 +253,29 @@ export default function Vendor() {
       session = JSON.parse(saved);
     } catch (error) {
       console.error("SESSION PARSE ERROR:", error);
-      localStorage.removeItem("salesExecutiveSession");
+
+      localStorage.removeItem(
+        "salesExecutiveSession"
+      );
+
       router.replace("/salesexecutive/login");
+
       return;
     }
 
-    /* =====================================================
-       LOAD SALES EXECUTIVE
-       ===================================================== */
+    if (!session?.id) {
+      localStorage.removeItem(
+        "salesExecutiveSession"
+      );
+
+      router.replace("/salesexecutive/login");
+
+      return;
+    }
+
+    /*
+     * LOAD SALES EXECUTIVE
+     */
 
     async function loadSalesExecutive() {
       const { data, error } = await supabase
@@ -224,6 +289,7 @@ export default function Vendor() {
           "SALES EXECUTIVE LOAD ERROR:",
           error
         );
+
         return;
       }
 
@@ -234,13 +300,16 @@ export default function Vendor() {
 
     loadSalesExecutive();
 
-    /* =====================================================
-       LOAD VENDOR FOR EDIT
-       ===================================================== */
+    /*
+     * LOAD VENDOR FOR EDIT
+     */
 
     const vendorId = router.query.id;
 
-    if (!vendorId) return;
+    if (!vendorId) {
+      setEditingId("");
+      return;
+    }
 
     async function loadVendor() {
       const { data, error } = await supabase
@@ -272,14 +341,41 @@ export default function Vendor() {
           "Could not load vendor",
           "This vendor is not available."
         );
+
         return;
       }
 
-      setEditingId(data.id);
+      setEditingId(String(data.id));
+
+      /*
+       * SET CATEGORY ID
+       */
+
+      const category = categories.find(
+        (item) =>
+          item.name === data.category
+      );
+
+      if (category) {
+        setSelectedCategoryId(
+          String(category.id)
+        );
+      }
+
+      /*
+       * EXISTING DOCUMENTS
+       */
+
       setExistingDocuments({
-        governmentProof: data.government_proof_path || "",
-        aadhaar: data.aadhaar_path || "",
+        governmentProof:
+          data.government_proof_path || "",
+        aadhaar:
+          data.aadhaar_path || "",
       });
+
+      /*
+       * FORM DATA
+       */
 
       setForm({
         business_name:
@@ -300,7 +396,8 @@ export default function Vendor() {
         email:
           data.email || "",
 
-        location: data.address || "",
+        location:
+          data.address || "",
 
         upi_id:
           data.upi_id || "",
@@ -317,24 +414,43 @@ export default function Vendor() {
         confirm_password:
           data.password || "",
       });
-      setHasSelectedLocation(Boolean(data.address));
+
+      setHasSelectedLocation(
+        Boolean(data.address)
+      );
     }
 
     loadVendor();
-  }, [router]);
+  }, [
+    router.isReady,
+    router.query.id,
+  ]);
+
+  /*
+   * =====================================================
+   * LOCATION SEARCH
+   * =====================================================
+   */
 
   useEffect(() => {
     const query = form.location.trim();
+
     let cancelled = false;
 
     if (locationSearchTimeout.current) {
-      clearTimeout(locationSearchTimeout.current);
+      clearTimeout(
+        locationSearchTimeout.current
+      );
     }
 
-    if (query.length < 3 || hasSelectedLocation) {
+    if (
+      query.length < 3 ||
+      hasSelectedLocation
+    ) {
       setLocationLoading(false);
       setLocationResults([]);
       setLocationResultsQuery("");
+
       return;
     }
 
@@ -343,47 +459,85 @@ export default function Vendor() {
     setLocationResultsQuery("");
     setLocationSearchError("");
 
-    locationSearchTimeout.current = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `/api/location/search?q=${encodeURIComponent(query)}`
-        );
-        const contentType = response.headers.get("content-type") || "";
+    locationSearchTimeout.current = setTimeout(
+      async () => {
+        try {
+          const response = await fetch(
+            `/api/location/search?q=${encodeURIComponent(
+              query
+            )}`
+          );
 
-        if (!response.ok || !contentType.includes("application/json")) {
-          throw new Error("Location search returned an invalid response.");
+          const contentType =
+            response.headers.get(
+              "content-type"
+            ) || "";
+
+          if (
+            !response.ok ||
+            !contentType.includes(
+              "application/json"
+            )
+          ) {
+            throw new Error(
+              "Location search returned an invalid response."
+            );
+          }
+
+          const data =
+            await response.json();
+
+          if (cancelled) return;
+
+          setLocationResults(
+            Array.isArray(data?.results)
+              ? data.results
+              : []
+          );
+
+          setLocationResultsQuery(query);
+        } catch (error) {
+          if (cancelled) return;
+
+          console.error(
+            "LOCATION SEARCH ERROR:",
+            error
+          );
+
+          setLocationResults([]);
+          setLocationResultsQuery(query);
+
+          setLocationSearchError(
+            "Could not search locations. Please try again."
+          );
+        } finally {
+          if (!cancelled) {
+            setLocationLoading(false);
+          }
         }
-
-        const data = await response.json();
-        if (cancelled) return;
-
-        setLocationResults(Array.isArray(data.results) ? data.results : []);
-        setLocationResultsQuery(query);
-      } catch (error) {
-        if (cancelled) return;
-
-        console.error("LOCATION SEARCH ERROR:", error);
-        setLocationResults([]);
-        setLocationResultsQuery(query);
-        setLocationSearchError(
-          "Could not search locations. Please try again."
-        );
-      } finally {
-        if (!cancelled) {
-          setLocationLoading(false);
-        }
-      }
-    }, 500);
+      },
+      500
+    );
 
     return () => {
       cancelled = true;
-      clearTimeout(locationSearchTimeout.current);
-    };
-  }, [form.location]);
 
-  /* =====================================================
-     HANDLE CHANGE
-     ===================================================== */
+      if (locationSearchTimeout.current) {
+        clearTimeout(
+          locationSearchTimeout.current
+        );
+      }
+    };
+  }, [
+    form.location,
+    hasSelectedLocation,
+  ]);
+
+  /*
+   * =====================================================
+   * HANDLE CHANGE
+   * =====================================================
+   */
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -394,34 +548,50 @@ export default function Vendor() {
     }));
   };
 
+  /*
+   * =====================================================
+   * CATEGORY CHANGE
+   * =====================================================
+   */
+
   const handleCategoryChange = (e) => {
     const categoryId = e.target.value;
-    const selectedCategory = categories.find(
-      (category) => String(category.id) === categoryId
-    );
+
+    const selectedCategory =
+      categories.find(
+        (category) =>
+          String(category.id) ===
+          String(categoryId)
+      );
 
     setSelectedCategoryId(categoryId);
     setSubcategories([]);
+
     setForm((prev) => ({
       ...prev,
-      category: selectedCategory?.name || "",
+      category:
+        selectedCategory?.name || "",
       subcategory: "",
     }));
   };
 
-  /* =====================================================
-     SEND WHATSAPP
-     ===================================================== */
+  /*
+   * =====================================================
+   * SEND WHATSAPP CREDENTIALS
+   * =====================================================
+   */
 
   const sendVendorCredentials = () => {
     const vendorMobile =
-      form.mobile_number.replace(/\D/g, "");
+      String(form.mobile_number || "")
+        .replace(/\D/g, "");
 
     if (!vendorMobile) {
       showError(
         "Mobile number missing",
         "Vendor mobile number is required to send WhatsApp credentials."
       );
+
       return;
     }
 
@@ -435,11 +605,10 @@ export default function Vendor() {
       "Veda Sales Executive";
 
     const salesMobile =
-      salesExecutive?.mobile_number ||
-      "";
+      salesExecutive?.mobile_number || "";
 
     const message = [
-      `*Hello ${form.business_name}*,`,
+      `*Hello ${form.business_name || "Vendor"}*,`,
       "",
       "Welcome to *Veda Vendor*.",
       "",
@@ -474,78 +643,162 @@ export default function Vendor() {
     );
   };
 
-  const handleDocumentChange = (event, setFile) => {
-    const file = event.target.files?.[0] || null;
+  /*
+   * =====================================================
+   * DOCUMENT CHANGE
+   * =====================================================
+   */
 
-    if (file && !hasAllowedDocumentType(file)) {
+  const handleDocumentChange = (
+    event,
+    setFile
+  ) => {
+    const file =
+      event.target.files?.[0] || null;
+
+    if (
+      file &&
+      !hasAllowedDocumentType(file)
+    ) {
       event.target.value = "";
       setFile(null);
+
       showError(
         "Invalid document type",
         "Please select a PDF, JPG, JPEG, or PNG document."
       );
+
       return;
     }
 
     setFile(file);
   };
 
-  const uploadDocument = async (vendorId, file, documentName) => {
+  /*
+   * =====================================================
+   * UPLOAD DOCUMENT
+   * =====================================================
+   */
+
+  const uploadDocument = async (
+    vendorId,
+    file,
+    documentName
+  ) => {
     if (!file) return null;
 
-    const extension = file.name.split(".").pop()?.toLowerCase() || "file";
+    const extension =
+      file.name
+        .split(".")
+        .pop()
+        ?.toLowerCase() || "file";
+
     const timestamp = Date.now();
-    const filename = `${documentName}-${timestamp}.${extension}`;
+
+    const filename =
+      `${documentName}-${timestamp}.${extension}`;
+
     const bucketAttempts = [
-      { bucket: "vendor-documents", path: `${vendorId}/${filename}` },
-      { bucket: "documents", path: `vendor-documents/${vendorId}/${filename}` },
+      {
+        bucket: "vendor-documents",
+        path: `${vendorId}/${filename}`,
+      },
+      {
+        bucket: "documents",
+        path: `vendor-documents/${vendorId}/${filename}`,
+      },
     ];
-    let lastError;
+
+    let lastError = null;
 
     for (const attempt of bucketAttempts) {
-      const { error } = await supabase.storage
-        .from(attempt.bucket)
-        .upload(attempt.path, file, {
-          contentType: file.type || undefined,
-          upsert: false,
-        });
+      const { error } =
+        await supabase.storage
+          .from(attempt.bucket)
+          .upload(
+            attempt.path,
+            file,
+            {
+              contentType:
+                file.type || undefined,
+              upsert: false,
+            }
+          );
 
       if (!error) {
         return {
           bucket: attempt.bucket,
           path: attempt.path,
-          reference: `${attempt.bucket}/${attempt.path}`,
+          reference:
+            `${attempt.bucket}/${attempt.path}`,
         };
       }
 
       lastError = error;
 
-      if (!/bucket.*not found|not found.*bucket/i.test(error.message || "")) {
+      if (
+        !/bucket.*not found|not found.*bucket/i.test(
+          error.message || ""
+        )
+      ) {
         break;
       }
     }
 
-    throw lastError || new Error("Document upload failed.");
-  };
-
-  const removeUploadedDocuments = async (uploads) => {
-    await Promise.all(
-      uploads.map(({ bucket, path }) =>
-        supabase.storage.from(bucket).remove([path])
+    throw (
+      lastError ||
+      new Error(
+        "Document upload failed."
       )
     );
   };
 
-  /* =====================================================
-     SUBMIT
-     ===================================================== */
+  /*
+   * =====================================================
+   * REMOVE UPLOADED DOCUMENTS
+   * =====================================================
+   */
+
+  const removeUploadedDocuments =
+    async (uploads) => {
+      if (!uploads?.length) return;
+
+      await Promise.all(
+        uploads.map(
+          async ({
+            bucket,
+            path,
+          }) => {
+            try {
+              await supabase.storage
+                .from(bucket)
+                .remove([path]);
+            } catch (error) {
+              console.error(
+                "DOCUMENT CLEANUP ERROR:",
+                error
+              );
+            }
+          }
+        )
+      );
+    };
+
+  /*
+   * =====================================================
+   * SUBMIT
+   * =====================================================
+   */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const saved = localStorage.getItem(
-      "salesExecutiveSession"
-    );
+    if (loading) return;
+
+    const saved =
+      localStorage.getItem(
+        "salesExecutiveSession"
+      );
 
     if (!saved) {
       return showError(
@@ -559,39 +812,73 @@ export default function Vendor() {
     try {
       session = JSON.parse(saved);
     } catch (error) {
+      console.error(
+        "SESSION PARSE ERROR:",
+        error
+      );
+
+      localStorage.removeItem(
+        "salesExecutiveSession"
+      );
+
       return showError(
         "Session error",
         "Please log in again."
       );
     }
 
-    /* =====================================================
-       REQUIRED SESSION ID
-       ===================================================== */
+    /*
+     * =====================================================
+     * SESSION ID
+     * =====================================================
+     */
 
-    if (!session.id) {
+    if (!session?.id) {
       return showError(
         "Session error",
         "Sales Executive ID was not found. Please log in again."
       );
     }
 
-    /* =====================================================
-       VALIDATION
-       ===================================================== */
+    /*
+     * =====================================================
+     * REQUIRED BASIC FIELDS
+     * =====================================================
+     */
 
-    if (
-      !form.business_name.trim() ||
-      !form.category.trim() ||
-      !form.subcategory.trim() ||
-      !form.owner_name.trim() ||
-      !form.mobile_number.trim()
-    ) {
+    if (!form.business_name.trim()) {
       return showError(
         "Vendor validation error",
-        "Please complete all required fields."
+        "Please enter business name."
       );
     }
+
+    if (!form.category.trim()) {
+      return showError(
+        "Vendor validation error",
+        "Please select category."
+      );
+    }
+
+    if (!form.subcategory.trim()) {
+      return showError(
+        "Vendor validation error",
+        "Please select subcategory."
+      );
+    }
+
+    if (!form.owner_name.trim()) {
+      return showError(
+        "Vendor validation error",
+        "Please enter owner name."
+      );
+    }
+
+    /*
+     * =====================================================
+     * PASSCODE VALIDATION
+     * =====================================================
+     */
 
     if (!form.password) {
       return showError(
@@ -606,31 +893,6 @@ export default function Vendor() {
         "Please confirm the passcode."
       );
     }
-
-    if (!form.location.trim() || !hasSelectedLocation) {
-      return showError(
-        "Location required",
-        "Please select a location from the search results."
-      );
-    }
-
-    if (!editingId && !governmentProofFile) {
-      return showError(
-        "Government Proof required",
-        "Please select the vendor's Government Proof document."
-      );
-    }
-
-    if (!editingId && !aadhaarFile) {
-      return showError(
-        "Aadhaar Card required",
-        "Please select the vendor's Aadhaar Card document."
-      );
-    }
-
-    /* =====================================================
-       PASSCODE VALIDATION
-       ===================================================== */
 
     if (!/^\d{4}$/.test(form.password)) {
       return showError(
@@ -649,12 +911,22 @@ export default function Vendor() {
       );
     }
 
-    /* =====================================================
-       MOBILE VALIDATION
-       ===================================================== */
+    /*
+     * =====================================================
+     * MOBILE VALIDATION
+     * =====================================================
+     */
 
     const cleanMobile =
-      form.mobile_number.replace(/\D/g, "");
+      String(form.mobile_number || "")
+        .replace(/\D/g, "");
+
+    if (!cleanMobile) {
+      return showError(
+        "Vendor validation error",
+        "Please enter vendor mobile number."
+      );
+    }
 
     if (cleanMobile.length !== 10) {
       return showError(
@@ -663,21 +935,38 @@ export default function Vendor() {
       );
     }
 
-    /* =====================================================
-       UPI VALIDATION
-       ===================================================== */
+    /*
+     * =====================================================
+     * EMAIL VALIDATION
+     * =====================================================
+     */
+
+    const cleanEmail =
+      form.email.trim();
+
+    if (
+      cleanEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        cleanEmail
+      )
+    ) {
+      return showError(
+        "Invalid email",
+        "Please enter a valid email address."
+      );
+    }
+
+    /*
+     * =====================================================
+     * UPI VALIDATION
+     * =====================================================
+     */
 
     const cleanUpiId =
       form.upi_id.trim();
 
-    if (!cleanUpiId) {
-      return showError(
-        "UPI ID required",
-        "Please enter the vendor UPI ID."
-      );
-    }
-
     if (
+      cleanUpiId &&
       !/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/.test(
         cleanUpiId
       )
@@ -688,9 +977,31 @@ export default function Vendor() {
       );
     }
 
-    /* =====================================================
-       OFFER VALIDATION
-       ===================================================== */
+    /*
+     * =====================================================
+     * LOCATION VALIDATION
+     * =====================================================
+     */
+
+    if (!form.location.trim()) {
+      return showError(
+        "Vendor validation error",
+        "Please select a location."
+      );
+    }
+
+    if (!hasSelectedLocation) {
+      return showError(
+        "Location selection",
+        "Please select a location from the search results."
+      );
+    }
+
+    /*
+     * =====================================================
+     * OFFER VALIDATION
+     * =====================================================
+     */
 
     let offerPercentage = null;
 
@@ -715,17 +1026,19 @@ export default function Vendor() {
       }
     }
 
-    setLoading(true);
+    /*
+     * =====================================================
+     * START SAVING
+     * =====================================================
+     */
 
-    /* =====================================================
-       PAYLOAD
-       ===================================================== */
+    setLoading(true);
 
     const payload = {
       sales_id: session.id,
 
       business_name:
-        form.business_name.trim(),
+        form.business_name.trim() || null,
 
       category:
         form.category.trim() || null,
@@ -734,18 +1047,19 @@ export default function Vendor() {
         form.subcategory.trim() || null,
 
       owner_name:
-        form.owner_name.trim(),
+        form.owner_name.trim() || null,
 
       mobile_number:
-        cleanMobile,
+        cleanMobile || null,
 
       email:
-        form.email.trim() || null,
+        cleanEmail || null,
 
-      address: form.location.trim(),
+      address:
+        form.location.trim() || null,
 
       upi_id:
-        cleanUpiId,
+        cleanUpiId || null,
 
       offer_percentage:
         offerPercentage,
@@ -758,19 +1072,48 @@ export default function Vendor() {
 
     let vendorId = editingId;
     let createdVendor = false;
+
     const uploadedDocuments = [];
 
     try {
+      /*
+       * ===================================================
+       * UPDATE EXISTING VENDOR
+       * ===================================================
+       */
+
       if (editingId) {
-        const { error } = await supabase
+        const {
+          data: updatedVendor,
+          error,
+        } = await supabase
           .from("vendors")
           .update(payload)
           .eq("id", editingId)
-          .eq("sales_id", session.id);
+          .eq("sales_id", session.id)
+          .select("id")
+          .maybeSingle();
 
         if (error) throw error;
-      } else {
-        const { data, error } = await supabase
+
+        if (!updatedVendor) {
+          throw new Error(
+            "Vendor could not be updated. Please check your access."
+          );
+        }
+      }
+
+      /*
+       * ===================================================
+       * CREATE NEW VENDOR
+       * ===================================================
+       */
+
+      else {
+        const {
+          data,
+          error,
+        } = await supabase
           .from("vendors")
           .insert(payload)
           .select("id")
@@ -779,63 +1122,122 @@ export default function Vendor() {
         if (error) throw error;
 
         vendorId = data?.id;
+
         createdVendor = true;
 
         if (!vendorId) {
-          throw new Error("The new vendor ID was not returned.");
+          throw new Error(
+            "The new vendor ID was not returned."
+          );
         }
       }
+
+      /*
+       * ===================================================
+       * DOCUMENT UPLOADS
+       * ===================================================
+       */
 
       const documentUpdates = {};
 
       if (governmentProofFile) {
-        const upload = await uploadDocument(
-          vendorId,
-          governmentProofFile,
-          "government-proof"
-        );
+        const upload =
+          await uploadDocument(
+            vendorId,
+            governmentProofFile,
+            "government-proof"
+          );
+
         uploadedDocuments.push(upload);
-        documentUpdates.government_proof_path = upload.reference;
+
+        documentUpdates.government_proof_path =
+          upload.reference;
       }
 
       if (aadhaarFile) {
-        const upload = await uploadDocument(
-          vendorId,
-          aadhaarFile,
-          "aadhaar"
-        );
+        const upload =
+          await uploadDocument(
+            vendorId,
+            aadhaarFile,
+            "aadhaar"
+          );
+
         uploadedDocuments.push(upload);
-        documentUpdates.aadhaar_path = upload.reference;
+
+        documentUpdates.aadhaar_path =
+          upload.reference;
       }
 
-      if (Object.keys(documentUpdates).length > 0) {
-        const { error } = await supabase
+      /*
+       * ===================================================
+       * SAVE DOCUMENT PATHS
+       * ===================================================
+       */
+
+      if (
+        Object.keys(
+          documentUpdates
+        ).length > 0
+      ) {
+        const {
+          data: documentUpdatedVendor,
+          error,
+        } = await supabase
           .from("vendors")
           .update(documentUpdates)
           .eq("id", vendorId)
-          .eq("sales_id", session.id);
+          .eq("sales_id", session.id)
+          .select("id")
+          .maybeSingle();
 
         if (error) throw error;
+
+        if (!documentUpdatedVendor) {
+          throw new Error(
+            "Document information could not be saved."
+          );
+        }
       }
     } catch (error) {
-      console.error("VENDOR SAVE OR DOCUMENT UPLOAD ERROR:", error);
-      await removeUploadedDocuments(uploadedDocuments);
+      console.error(
+        "VENDOR SAVE OR DOCUMENT UPLOAD ERROR:",
+        error
+      );
 
-      if (createdVendor && vendorId) {
-        const { error: deleteError } = await supabase
+      await removeUploadedDocuments(
+        uploadedDocuments
+      );
+
+      /*
+       * DELETE NEW VENDOR IF CREATION FAILED
+       */
+
+      if (
+        createdVendor &&
+        vendorId
+      ) {
+        const {
+          error: deleteError,
+        } = await supabase
           .from("vendors")
           .delete()
           .eq("id", vendorId)
           .eq("sales_id", session.id);
 
         if (deleteError) {
-          console.error("VENDOR CLEANUP ERROR:", deleteError);
+          console.error(
+            "VENDOR CLEANUP ERROR:",
+            deleteError
+          );
         }
       }
 
       setLoading(false);
+
       return showError(
-        editingId ? "Vendor update failed" : "Vendor creation failed",
+        editingId
+          ? "Vendor update failed"
+          : "Vendor creation failed",
         friendlyError(
           error,
           "The vendor and documents could not be saved. Please try again."
@@ -845,9 +1247,11 @@ export default function Vendor() {
 
     setLoading(false);
 
-    /* =====================================================
-       EDIT SUCCESS
-       ===================================================== */
+    /*
+     * =====================================================
+     * EDIT SUCCESS
+     * =====================================================
+     */
 
     if (editingId) {
       await showSuccess(
@@ -861,24 +1265,33 @@ export default function Vendor() {
       return;
     }
 
-    /* =====================================================
-       NEW VENDOR SUCCESS
-       ===================================================== */
+    /*
+     * =====================================================
+     * NEW VENDOR SUCCESS
+     * =====================================================
+     */
 
     const shareResult =
       await Swal.fire({
         icon: "success",
+
         title:
           "Vendor registered successfully",
+
         text:
           "Send the vendor's login credentials through WhatsApp.",
+
         showCancelButton: true,
+
         confirmButtonText:
           "Share on WhatsApp",
+
         cancelButtonText:
           "Done",
+
         confirmButtonColor:
           "#13273c",
+
         cancelButtonColor:
           "#6b7280",
       });
@@ -892,15 +1305,19 @@ export default function Vendor() {
     );
   };
 
+  /*
+   * =====================================================
+   * RENDER
+   * =====================================================
+   */
+
   return (
     <div className="min-h-screen bg-[#f7f8fa]">
-
       <main className="pb-20">
 
         {/* ================= HEADER ================= */}
 
         <div className="bg-white border-b border-gray-100">
-
           <div className="px-5 py-3 flex items-center gap-3">
 
             <button
@@ -919,7 +1336,6 @@ export default function Vendor() {
             </button>
 
             <div>
-
               <h1
                 className="
                   text-[14px]
@@ -942,17 +1358,14 @@ export default function Vendor() {
                   ? "Update vendor details"
                   : "Add new vendor details"}
               </p>
-
             </div>
 
           </div>
-
         </div>
 
         {/* ================= REGISTRATION CARD ================= */}
 
         <div className="px-2 pt-3">
-
           <div
             className="
               bg-white
@@ -973,7 +1386,6 @@ export default function Vendor() {
                 mb-4
               "
             >
-
               <div
                 className="
                   w-8
@@ -990,7 +1402,6 @@ export default function Vendor() {
               </div>
 
               <div>
-
                 <h2
                   className="
                     text-[12px]
@@ -1011,9 +1422,7 @@ export default function Vendor() {
                 >
                   Enter vendor information
                 </p>
-
               </div>
-
             </div>
 
             {/* ================= FORM ================= */}
@@ -1030,7 +1439,6 @@ export default function Vendor() {
                   name="business_name"
                   value={form.business_name}
                   onChange={handleChange}
-                  required
                 />
 
                 <SelectBox
@@ -1040,18 +1448,23 @@ export default function Vendor() {
                   value={activeCategoryId}
                   onChange={handleCategoryChange}
                   disabled={categoriesLoading}
-                  required
                 >
                   <option value="">
                     {categoriesLoading
                       ? "Loading categories..."
                       : "Select category"}
                   </option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
+
+                  {categories.map(
+                    (category) => (
+                      <option
+                        key={category.id}
+                        value={category.id}
+                      >
+                        {category.name}
+                      </option>
+                    )
+                  )}
                 </SelectBox>
 
                 <SelectBox
@@ -1061,9 +1474,9 @@ export default function Vendor() {
                   value={form.subcategory}
                   onChange={handleChange}
                   disabled={
-                    !activeCategoryId || subcategoriesLoading
+                    !activeCategoryId ||
+                    subcategoriesLoading
                   }
-                  required
                 >
                   <option value="">
                     {!activeCategoryId
@@ -1072,14 +1485,17 @@ export default function Vendor() {
                       ? "Loading subcategories..."
                       : "Select subcategory"}
                   </option>
-                  {subcategories.map((subcategory) => (
-                    <option
-                      key={subcategory.id}
-                      value={subcategory.name}
-                    >
-                      {subcategory.name}
-                    </option>
-                  ))}
+
+                  {subcategories.map(
+                    (subcategory) => (
+                      <option
+                        key={subcategory.id}
+                        value={subcategory.name}
+                      >
+                        {subcategory.name}
+                      </option>
+                    )
+                  )}
                 </SelectBox>
 
                 <InputBox
@@ -1090,7 +1506,6 @@ export default function Vendor() {
                   name="owner_name"
                   value={form.owner_name}
                   onChange={handleChange}
-                  required
                 />
 
                 <InputBox
@@ -1101,7 +1516,6 @@ export default function Vendor() {
                   name="mobile_number"
                   value={form.mobile_number}
                   onChange={handleChange}
-                  required
                 />
 
                 <InputBox
@@ -1112,70 +1526,94 @@ export default function Vendor() {
                   name="email"
                   value={form.email}
                   onChange={handleChange}
-                  required={false}
                 />
 
                 <LocationAutocomplete
                   value={form.location}
                   onChange={(value) => {
-                    setForm((prev) => ({ ...prev, location: value }));
-                    setHasSelectedLocation(false);
+                    setForm((prev) => ({
+                      ...prev,
+                      location: value,
+                    }));
+
+                    setHasSelectedLocation(
+                      false
+                    );
+
                     setLocationSearchError("");
                   }}
                   onSelect={(location) => {
+                    const selectedAddress =
+                      location.formatted_address ||
+                      location.display_name ||
+                      "";
+
                     setForm((prev) => ({
                       ...prev,
                       location:
-                        location.formatted_address ||
-                        location.display_name ||
-                        "",
+                        selectedAddress,
                     }));
-                    setHasSelectedLocation(true);
+
+                    setHasSelectedLocation(
+                      true
+                    );
+
                     setLocationLoading(false);
-                    setShowLocationResults(false);
+                    setShowLocationResults(
+                      false
+                    );
                   }}
                   error={locationSearchError}
                   results={locationResults}
-                  resultsQuery={locationResultsQuery}
+                  resultsQuery={
+                    locationResultsQuery
+                  }
                   loading={locationLoading}
                   open={showLocationResults}
-                  onOpenChange={setShowLocationResults}
+                  onOpenChange={
+                    setShowLocationResults
+                  }
                 />
 
                 <DocumentBox
                   label="Government Proof"
                   file={governmentProofFile}
-                  existingReference={existingDocuments.governmentProof}
-                  onChange={(event) =>
-                    handleDocumentChange(event, setGovernmentProofFile)
+                  existingReference={
+                    existingDocuments.governmentProof
                   }
-                  required={!editingId}
+                  onChange={(event) =>
+                    handleDocumentChange(
+                      event,
+                      setGovernmentProofFile
+                    )
+                  }
                 />
 
                 <DocumentBox
                   label="Aadhaar Card"
                   file={aadhaarFile}
-                  existingReference={existingDocuments.aadhaar}
-                  onChange={(event) =>
-                    handleDocumentChange(event, setAadhaarFile)
+                  existingReference={
+                    existingDocuments.aadhaar
                   }
-                  required={!editingId}
+                  onChange={(event) =>
+                    handleDocumentChange(
+                      event,
+                      setAadhaarFile
+                    )
+                  }
                 />
 
-                {/* UPI ID */}
-
                 <InputBox
-                  icon={<CreditCard size={12} />}
+                  icon={
+                    <CreditCard size={12} />
+                  }
                   label="UPI ID"
                   placeholder="example@ybl"
                   type="text"
                   name="upi_id"
                   value={form.upi_id}
                   onChange={handleChange}
-                  required
                 />
-
-                {/* OFFER */}
 
                 <InputBox
                   icon={null}
@@ -1183,9 +1621,10 @@ export default function Vendor() {
                   placeholder="Enter %"
                   type="number"
                   name="offer_percentage"
-                  value={form.offer_percentage}
+                  value={
+                    form.offer_percentage
+                  }
                   onChange={handleChange}
-                  required={false}
                 />
 
                 {/* PASSCODE */}
@@ -1196,7 +1635,9 @@ export default function Vendor() {
                   name="password"
                   value={form.password}
                   onChange={handleChange}
-                  showPassword={showPassword}
+                  showPassword={
+                    showPassword
+                  }
                   setShowPassword={
                     setShowPassword
                   }
@@ -1232,7 +1673,6 @@ export default function Vendor() {
                   pt-5
                 "
               >
-
                 <button
                   type="button"
                   onClick={() =>
@@ -1269,9 +1709,9 @@ export default function Vendor() {
                     shadow
                     hover:bg-[#1d3b5d]
                     disabled:opacity-60
+                    disabled:cursor-not-allowed
                   "
                 >
-
                   <CheckCircle size={12} />
 
                   {loading
@@ -1279,42 +1719,95 @@ export default function Vendor() {
                     : editingId
                     ? "Save Vendor"
                     : "Register Vendor"}
-
                 </button>
-
               </div>
 
             </form>
-
           </div>
-
         </div>
-
       </main>
 
       <Footer />
-
     </div>
   );
 }
 
-/* =====================================================
-   INPUT BOX
-   ===================================================== */
+/*
+ * =====================================================
+ * INPUT BOX
+ * =====================================================
+ */
 
 function InputBox({
   icon,
   label,
   placeholder,
   type = "text",
-  required,
   name,
   value,
   onChange,
 }) {
   return (
     <div>
+     <label className="text-[9px] font-semibold text-[#13273c]">
+        {label}
+      </label>
 
+      <div
+        className="
+          mt-1
+          flex
+          items-center
+          bg-[#fafafa]
+          border
+          border-gray-200
+          rounded-xl
+          px-3
+          h-[40px]
+          focus-within:border-[#13273c]
+        "
+      >
+        {icon && (
+          <span className="text-gray-400">
+            {icon}
+          </span>
+        )}
+
+        <input
+          type={type}
+          name={name}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className="
+            w-full
+            bg-transparent
+            px-2
+            outline-none
+            text-[10px]
+            text-gray-700
+            placeholder:text-gray-400
+          "
+        />
+      </div>
+    </div>
+  );
+}
+
+/*
+ * =====================================================
+ * DOCUMENT BOX
+ * =====================================================
+ */
+
+function DocumentBox({
+  label,
+  file,
+  existingReference,
+  onChange,
+}) {
+  return (
+    <div>
       <label
         className="
           text-[9px]
@@ -1339,61 +1832,31 @@ function InputBox({
           focus-within:border-[#13273c]
         "
       >
-
-        {icon && (
-          <span className="text-gray-400">
-            {icon}
-          </span>
-        )}
-
-        <input
-          type={type}
-          name={name}
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          required={required}
-          className="
-            w-full
-            bg-transparent
-            px-2
-            outline-none
-            text-[10px]
-            text-gray-700
-            placeholder:text-gray-400
-          "
-        />
-
-      </div>
-
-    </div>
-  );
-}
-
-function DocumentBox({
-  label,
-  file,
-  existingReference,
-  onChange,
-  required,
-}) {
-  return (
-    <div>
-      <label className="text-[9px] font-semibold text-[#13273c]">
-        {label} {required && <span className="text-red-500">* Required</span>}
-      </label>
-
-      <div className="mt-1 flex items-center bg-[#fafafa] border border-gray-200 rounded-xl px-3 h-[40px] focus-within:border-[#13273c]">
         <input
           type="file"
           accept={DOCUMENT_ACCEPT}
           onChange={onChange}
-          required={required}
-          className="w-full text-[9px] text-gray-700 file:mr-2 file:border-0 file:bg-transparent file:text-[9px] file:font-semibold file:text-[#13273c]"
+          className="
+            w-full
+            text-[9px]
+            text-gray-700
+            file:mr-2
+            file:border-0
+            file:bg-transparent
+            file:text-[9px]
+            file:font-semibold
+            file:text-[#13273c]
+          "
         />
       </div>
 
-      <p className="mt-1 text-[8px] text-gray-500">
+      <p
+        className="
+          mt-1
+          text-[8px]
+          text-gray-500
+        "
+      >
         {file
           ? `Selected: ${file.name}`
           : existingReference
@@ -1403,6 +1866,12 @@ function DocumentBox({
     </div>
   );
 }
+
+/*
+ * =====================================================
+ * LOCATION AUTOCOMPLETE
+ * =====================================================
+ */
 
 function LocationAutocomplete({
   value,
@@ -1421,68 +1890,181 @@ function LocationAutocomplete({
       ? results
       : [];
 
-  const selectLocation = (location) => {
+  const selectLocation = (
+    location
+  ) => {
     onSelect(location);
     onOpenChange(false);
   };
 
   return (
     <div className="relative">
-      <label className="text-[9px] font-semibold text-[#13273c]">Location</label>
+      <label
+        className="
+          text-[9px]
+          font-semibold
+          text-[#13273c]
+        "
+      >
+        Location
+      </label>
 
-      <div className="mt-1 flex items-center bg-[#fafafa] border border-gray-200 rounded-xl px-3 h-[40px] focus-within:border-[#13273c]">
-        <span className="text-gray-400"><MapPin size={12} /></span>
+      <div
+        className="
+          mt-1
+          flex
+          items-center
+          bg-[#fafafa]
+          border
+          border-gray-200
+          rounded-xl
+          px-3
+          h-[40px]
+          focus-within:border-[#13273c]
+        "
+      >
+        <span className="text-gray-400">
+          <MapPin size={12} />
+        </span>
+
         <input
           type="text"
           name="location"
           value={value}
           onChange={(event) => {
-            onChange(event.target.value);
+            onChange(
+              event.target.value
+            );
+
             onOpenChange(true);
           }}
-          onFocus={() => onOpenChange(true)}
+          onFocus={() =>
+            onOpenChange(true)
+          }
           placeholder="Search full address/location..."
           autoComplete="off"
-          className="w-full bg-transparent px-2 outline-none text-[10px] text-gray-700 placeholder:text-gray-400"
+          className="
+            w-full
+            bg-transparent
+            px-2
+            outline-none
+            text-[10px]
+            text-gray-700
+            placeholder:text-gray-400
+          "
         />
       </div>
 
-      {open && value.trim().length >= 3 && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
-          {loading && (
-            <p className="px-3 py-2 text-[9px] text-gray-500">Searching locations...</p>
-          )}
-          {!loading && error && (
-            <p className="px-3 py-2 text-[9px] text-red-500">{error}</p>
-          )}
-          {!loading && !error && visibleResults.length === 0 && (
-            <p className="px-3 py-2 text-[9px] text-gray-500">No locations found</p>
-          )}
-          {!loading && !error && visibleResults.map((location) => (
-            <button
-              key={location.place_id}
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => selectLocation(location)}
-              className="block w-full border-b border-gray-100 px-3 py-2 text-left text-[9px] text-gray-700 last:border-b-0 hover:bg-gray-50"
-            >
-              {location.formatted_address || location.display_name}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        value.trim().length >= 3 && (
+          <div
+            className="
+              absolute
+              z-20
+              mt-1
+              w-full
+              overflow-hidden
+              rounded-xl
+              border
+              border-gray-200
+              bg-white
+              shadow-lg
+            "
+          >
+            {loading && (
+              <p
+                className="
+                  px-3
+                  py-2
+                  text-[9px]
+                  text-gray-500
+                "
+              >
+                Searching locations...
+              </p>
+            )}
+
+            {!loading && error && (
+              <p
+                className="
+                  px-3
+                  py-2
+                  text-[9px]
+                  text-red-500
+                "
+              >
+                {error}
+              </p>
+            )}
+
+            {!loading &&
+              !error &&
+              visibleResults.length === 0 && (
+                <p
+                  className="
+                    px-3
+                    py-2
+                    text-[9px]
+                    text-gray-500
+                  "
+                >
+                  No locations found
+                </p>
+              )}
+
+            {!loading &&
+              !error &&
+              visibleResults.map(
+                (location, index) => (
+                  <button
+                    key={
+                      location.place_id ||
+                      location.id ||
+                      `${location.display_name}-${index}`
+                    }
+                    type="button"
+                    onMouseDown={(event) =>
+                      event.preventDefault()
+                    }
+                    onClick={() =>
+                      selectLocation(
+                        location
+                      )
+                    }
+                    className="
+                      block
+                      w-full
+                      border-b
+                      border-gray-100
+                      px-3
+                      py-2
+                      text-left
+                      text-[9px]
+                      text-gray-700
+                      last:border-b-0
+                      hover:bg-gray-50
+                    "
+                  >
+                    {location.formatted_address ||
+                      location.display_name}
+                  </button>
+                )
+              )}
+          </div>
+        )}
     </div>
   );
 }
 
-/* =====================================================
-   SELECT BOX
-   ===================================================== */
+/*
+ * =====================================================
+ * SELECT BOX
+ * =====================================================
+ */
 
 function SelectBox({
   icon,
   label,
-  required,
   name,
   value,
   onChange,
@@ -1491,7 +2073,6 @@ function SelectBox({
 }) {
   return (
     <div>
-
       <label
         className="
           text-[9px]
@@ -1516,7 +2097,6 @@ function SelectBox({
           focus-within:border-[#13273c]
         "
       >
-
         {icon && (
           <span className="text-gray-400">
             {icon}
@@ -1528,7 +2108,6 @@ function SelectBox({
           value={value}
           onChange={onChange}
           disabled={disabled}
-          required={required}
           className="
             w-full
             bg-transparent
@@ -1542,16 +2121,16 @@ function SelectBox({
         >
           {children}
         </select>
-
       </div>
-
     </div>
   );
 }
 
-/* =====================================================
-   PASSCODE BOX
-   ===================================================== */
+/*
+ * =====================================================
+ * PASSCODE BOX
+ * =====================================================
+ */
 
 function PasswordBox({
   label,
@@ -1564,7 +2143,6 @@ function PasswordBox({
 }) {
   return (
     <div>
-
       <label
         className="
           text-[9px]
@@ -1589,7 +2167,6 @@ function PasswordBox({
           focus-within:border-[#13273c]
         "
       >
-
         <span className="text-gray-400">
           <Lock size={12} />
         </span>
@@ -1620,15 +2197,12 @@ function PasswordBox({
           inputMode="numeric"
           pattern="[0-9]{4}"
           required
-          className="
-            w-full
-            bg-transparent
-            px-2
-            outline-none
-            text-[10px]
-            text-gray-700
-            placeholder:text-gray-400
-          "
+          autoComplete={
+            name === "password"
+              ? "new-password"
+              : "new-password"
+          }
+          className="w-full bg-transparent px-2 outline-none text-[10px] text-gray-700 placeholder:text-gray-400"
         />
 
         <button
@@ -1638,12 +2212,7 @@ function PasswordBox({
               !showPassword
             )
           }
-          className="
-            text-gray-400
-            flex
-            items-center
-            justify-center
-          "
+           className="text-gray-400 flex items-center justify-cente"
         >
           {showPassword ? (
             <EyeOff size={12} />
@@ -1651,16 +2220,7 @@ function PasswordBox({
             <Eye size={12} />
           )}
         </button>
-
       </div>
-
     </div>
   );
 }
-
-
-
-
-
-
-
