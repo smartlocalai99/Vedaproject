@@ -17,6 +17,7 @@ export default function App({ Component, pageProps }) {
 
   const manifest = isQrPrinter ? "/qr-printer-manifest.json" : isSales ? "/sales-manifest.json" : null;
   const themeColor = isQrPrinter ? "#172033" : isSales ? "#13273C" : "#111827";
+  const icon = isQrPrinter ? "/Logo%20veda.png" : "/icons/veda-192.png";
 
-  return <><Head>{manifest && <><link rel="manifest" href={manifest} /><meta name="theme-color" content={themeColor} /><link rel="icon" href="/icons/veda-192.png" /></>}</Head><Component {...pageProps} /></>;
+  return <><Head>{manifest && <><link rel="manifest" href={manifest} /><meta name="theme-color" content={themeColor} /><link rel="icon" href={icon} /></>}</Head><Component {...pageProps} /></>;
 }

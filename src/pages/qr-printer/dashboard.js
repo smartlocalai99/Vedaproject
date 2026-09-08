@@ -481,7 +481,7 @@ export default function QrPrinterDashboard() {
             onClick={installApp}
             className="mt-4 min-h-11 w-full rounded-xl border border-[#B97943] bg-white px-4 py-3 text-sm font-semibold text-[#8a5028] hover:bg-[#fff8f3]"
           >
-            Install vedaqrprinter
+            Install VEDA QR Printer
           </button>
         )}
 

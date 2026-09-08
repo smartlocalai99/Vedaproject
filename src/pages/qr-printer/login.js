@@ -143,7 +143,7 @@ export default function QrPrinterLogin() {
               onClick={installApp}
               className="mt-5 min-h-11 w-full rounded-xl border border-[#B97943] bg-white px-4 py-3 text-sm font-semibold text-[#8a5028]"
             >
-              Install vedaqrprinter
+              Install VEDA QR Printer
             </button>
           )}
 

@@ -26,8 +26,8 @@ export default class VedaDocument extends Document {
           <meta name="description" content="VEDA Minds QR Printer Partner application for managing QR printer members and QR codes." />
           <meta name="apple-mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-          <meta name="apple-mobile-web-app-title" content="Veda QR Printer" />
-          <link rel="apple-touch-icon" href="/icons/veda-192.png" />
+          <meta name="apple-mobile-web-app-title" content="VEDA QR Printer" />
+          <link rel="apple-touch-icon" href="/Logo%20veda.png" />
         </>}
       </Head>
       <body className="antialiased"><Main /><NextScript /></body>
