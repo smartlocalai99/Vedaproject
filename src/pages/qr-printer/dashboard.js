@@ -79,6 +79,7 @@ export default function QrPrinterDashboard() {
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [installPrompt, setInstallPrompt] = useState(null);
 
   /* =====================================================
      LOAD MEMBERS
@@ -296,6 +297,23 @@ export default function QrPrinterDashboard() {
       window.clearTimeout(loadTimer);
   }, [user, loadMembers]);
 
+  useEffect(() => {
+    const handleInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
+  }, []);
+
+  const installApp = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
+
   /* =====================================================
      QR PREVIEW
      ===================================================== */
@@ -456,6 +474,16 @@ export default function QrPrinterDashboard() {
           View and download print-ready QR
           codes for registered members.
         </p>
+
+        {installPrompt && (
+          <button
+            type="button"
+            onClick={installApp}
+            className="mt-4 min-h-11 w-full rounded-xl border border-[#B97943] bg-white px-4 py-3 text-sm font-semibold text-[#8a5028] hover:bg-[#fff8f3]"
+          >
+            Install vedaqrprinter
+          </button>
+        )}
 
         {/* SEARCH */}
 
