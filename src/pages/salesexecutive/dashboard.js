@@ -148,10 +148,7 @@ export default function Dashboard() {
               count: "exact",
               head: true,
             })
-            .eq(
-              "sales_id",
-              session.id
-            ),
+            .or(`sales_id.eq.${session.id},sales_id.is.null`),
         ]);
 
         if (vendorsResult.error) {
@@ -390,10 +387,7 @@ export default function Dashboard() {
           .select(
             "id, created_at"
           )
-          .eq(
-            "sales_id",
-            session.id
-          )
+          .or(`sales_id.eq.${session.id},sales_id.is.null`)
           .order(
             "created_at",
             {

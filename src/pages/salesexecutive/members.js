@@ -62,7 +62,7 @@ export default function Members() {
       const { data, error } = await supabase
         .from("members")
         .select("*")
-        .eq("sales_id", salesId)
+        .or(`sales_id.eq.${salesId},sales_id.is.null`)
         .order("created_at", {
           ascending: false,
         });

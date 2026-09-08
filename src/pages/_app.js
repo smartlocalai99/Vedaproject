@@ -6,6 +6,7 @@ import { useEffect } from "react";
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isSales = router.pathname.startsWith("/salesexecutive");
+  const isQrPrinter = router.pathname.startsWith("/qr-printer");
   const isSuperAdmin = router.pathname.startsWith("/superadmin") || router.pathname === "/";
 
   useEffect(() => {
@@ -14,8 +15,8 @@ export default function App({ Component, pageProps }) {
     }
   }, []);
 
-  const manifest = isSales ? "/sales-manifest.json" : null;
-  const themeColor = isSales ? "#13273C" : "#111827";
+  const manifest = isQrPrinter ? "/qr-printer-manifest.json" : isSales ? "/sales-manifest.json" : null;
+  const themeColor = isQrPrinter ? "#172033" : isSales ? "#13273C" : "#111827";
 
   return <><Head>{manifest && <><link rel="manifest" href={manifest} /><meta name="theme-color" content={themeColor} /><link rel="icon" href="/icons/veda-192.png" /></>}</Head><Component {...pageProps} /></>;
 }
