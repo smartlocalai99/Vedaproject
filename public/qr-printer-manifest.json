@@ -1,5 +1,5 @@
 {
-  "id": "/qr-printer/",
+  "id": "/qr-printer-app",
   "name": "VEDA QR Printer",
   "short_name": "VEDA QR Printer",
   "description": "VEDA Minds QR Printer Partner application for managing QR printer members and QR codes.",
