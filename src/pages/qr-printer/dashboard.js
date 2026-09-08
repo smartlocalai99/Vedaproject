@@ -79,7 +79,8 @@ export default function QrPrinterDashboard() {
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [qrLoading, setQrLoading] = useState(false);
   const [actionError, setActionError] = useState("");
-  const [installPrompt, setInstallPrompt] = useState(null);
+
+
 
   /* =====================================================
      LOAD MEMBERS
@@ -297,22 +298,6 @@ export default function QrPrinterDashboard() {
       window.clearTimeout(loadTimer);
   }, [user, loadMembers]);
 
-  useEffect(() => {
-    const handleInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallPrompt(event);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
-  }, []);
-
-  const installApp = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    await installPrompt.userChoice;
-    setInstallPrompt(null);
-  };
 
   /* =====================================================
      QR PREVIEW
@@ -475,21 +460,13 @@ export default function QrPrinterDashboard() {
           codes for registered members.
         </p>
 
-        {installPrompt && (
-          <button
-            type="button"
-            onClick={installApp}
-            className="mt-4 min-h-11 w-full rounded-xl border border-[#B97943] bg-white px-4 py-3 text-sm font-semibold text-[#8a5028] hover:bg-[#fff8f3]"
-          >
-            Install VEDA QR Printer
-          </button>
-        )}
 
         {/* SEARCH */}
 
         <form
           onSubmit={(event) => {
             event.preventDefault();
+
             setSearch(
               searchInput.trim()
             );
@@ -517,12 +494,7 @@ export default function QrPrinterDashboard() {
 
           </label>
 
-          <button
-            type="submit"
-            className="min-h-11 w-full rounded-xl bg-[#B97943] px-4 py-3 font-semibold text-white hover:bg-[#9f6234] sm:w-auto"
-          >
-            Search
-          </button>
+         
 
         </form>
 
@@ -723,7 +695,7 @@ export default function QrPrinterDashboard() {
                   <img
                     src={qrDataUrl}
                     alt={`QR code for ${selectedMember.card_number}`}
-                    className="block h-auto max-w-full w-full"
+                    className="block h-auto w-full max-w-full"
                   />
                 ) : (
                   <p className="py-10 text-sm text-red-700">

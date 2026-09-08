@@ -15,10 +15,11 @@ export default function QrPrinterLogin() {
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
 
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [installPrompt, setInstallPrompt] = useState(null);
 
   /* =====================================================
      CHECK EXISTING LOCAL LOGIN
@@ -26,6 +27,7 @@ export default function QrPrinterLogin() {
 
   useEffect(() => {
     if (!router.isReady) return;
+
     const loggedIn = localStorage.getItem(
       "qr_printer_logged_in"
     );
@@ -34,26 +36,11 @@ export default function QrPrinterLogin() {
       loggedIn === "true" &&
       router.pathname === "/qr-printer/login"
     ) {
-      router.replace("/qr-printer/dashboard");
+      router.replace(
+        "/qr-printer/dashboard"
+      );
     }
   }, [router]);
-
-  useEffect(() => {
-    const handleInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallPrompt(event);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
-  }, []);
-
-  const installApp = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    await installPrompt.userChoice;
-    setInstallPrompt(null);
-  };
 
   /* =====================================================
      LOGIN
@@ -64,7 +51,8 @@ export default function QrPrinterLogin() {
 
     setError("");
 
-    const cleanMobile = mobile.replace(/\D/g, "");
+    const cleanMobile =
+      mobile.replace(/\D/g, "");
 
     if (!cleanMobile || !password) {
       setError(
@@ -76,8 +64,6 @@ export default function QrPrinterLogin() {
     setLoading(true);
 
     try {
-      
-
       if (
         cleanMobile === "9182742990" &&
         password === "123456"
@@ -116,9 +102,9 @@ export default function QrPrinterLogin() {
      ===================================================== */
 
   return (
-    <main className="qr-printer-safe-top qr-printer-safe-bottom min-h-screen w-full overflow-x-hidden bg-[#F7F7F7] px-4 flex items-center justify-center">
+    <main className="qr-printer-safe-top qr-printer-safe-bottom flex min-h-screen w-full items-center justify-center overflow-x-hidden bg-[#F7F7F7] px-4">
 
-      <section className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-8 shadow-lg border border-[#E9E2DC]">
+      <section className="w-full max-w-md rounded-3xl border border-[#E9E2DC] bg-white p-7 shadow-lg sm:p-8">
 
         {/* LOGO */}
 
@@ -136,16 +122,6 @@ export default function QrPrinterLogin() {
           <h1 className="mt-4 text-3xl font-bold text-[#172033]">
             QR Printer Partner
           </h1>
-
-          {installPrompt && (
-            <button
-              type="button"
-              onClick={installApp}
-              className="mt-5 min-h-11 w-full rounded-xl border border-[#B97943] bg-white px-4 py-3 text-sm font-semibold text-[#8a5028]"
-            >
-              Install VEDA QR Printer
-            </button>
-          )}
 
         </div>
 
@@ -186,7 +162,7 @@ export default function QrPrinterLogin() {
 
                   setMobile(value);
                 }}
-                className="w-full rounded-xl border border-[#B97943] py-3 pl-[72px] pr-4 text-base outline-none  focus:ring-orange-200"
+                className="w-full rounded-xl border border-[#B97943] py-3 pl-[72px] pr-4 text-base outline-none focus:ring-orange-200"
                 placeholder="Enter mobile number"
                 inputMode="numeric"
                 autoComplete="tel"
@@ -224,7 +200,7 @@ export default function QrPrinterLogin() {
                     event.target.value
                   )
                 }
-                className="w-full rounded-xl border border-[#B97943] py-3 pl-12 pr-12 text-base outline-none  focus:ring-orange-200"
+                className="w-full rounded-xl border border-[#B97943] py-3 pl-12 pr-12 text-base outline-none focus:ring-orange-200"
                 placeholder="Enter your password"
                 autoComplete="current-password"
                 disabled={loading}
