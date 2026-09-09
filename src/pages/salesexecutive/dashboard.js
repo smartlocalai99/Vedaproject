@@ -47,10 +47,6 @@ export default function Dashboard() {
     setLoadingMemberPerformance,
   ] = useState(true);
 
-  /* =====================================================
-     GET SESSION
-     ===================================================== */
-
   const getSalesSession = () => {
     const saved =
       localStorage.getItem(
@@ -148,7 +144,7 @@ export default function Dashboard() {
               count: "exact",
               head: true,
             })
-            .or(`sales_id.eq.${session.id},sales_id.is.null`),
+            .eq("sales_id", session.id),
         ]);
 
         if (vendorsResult.error) {
@@ -387,7 +383,7 @@ export default function Dashboard() {
           .select(
             "id, created_at"
           )
-          .or(`sales_id.eq.${session.id},sales_id.is.null`)
+          .eq("sales_id", session.id)
           .order(
             "created_at",
             {
@@ -1201,3 +1197,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
+
+

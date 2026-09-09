@@ -344,7 +344,7 @@ export default function SalesLogin() {
                   pr-4
                   py-3
                   outline-none
-                  focus:ring-2
+                  
                   focus:ring-orange-200
                 "
                 inputMode="numeric"
@@ -393,7 +393,7 @@ export default function SalesLogin() {
                   pr-12
                   py-3
                   outline-none
-                  focus:ring-2
+                
                   focus:ring-orange-200
                 "
                 autoComplete="current-password"

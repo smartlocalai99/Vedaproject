@@ -52,7 +52,7 @@ export default function Members() {
       return;
     }
 
-    loadMembers(session.id);
+    window.setTimeout(() => loadMembers(session.id), 0);
   }, [router]);
 
   const loadMembers = async (salesId) => {
@@ -62,7 +62,7 @@ export default function Members() {
       const { data, error } = await supabase
         .from("members")
         .select("*")
-        .or(`sales_id.eq.${salesId},sales_id.is.null`)
+        .eq("sales_id", salesId)
         .order("created_at", {
           ascending: false,
         });
@@ -110,7 +110,16 @@ export default function Members() {
       const { error } = await supabase
         .from("members")
         .delete()
-        .eq("id", member.id);
+        .eq("id", member.id)
+        .eq("sales_id", (() => {
+          try {
+            return JSON.parse(
+              localStorage.getItem("salesExecutiveSession") || "{}"
+            ).id || "";
+          } catch {
+            return "";
+          }
+        })());
 
       if (error) {
         console.error("DELETE MEMBER ERROR:", error);

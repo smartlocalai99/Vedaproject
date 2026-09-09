@@ -106,10 +106,25 @@ export default function Vendors() {
       return;
     }
 
+    let sessionId = "";
+    try {
+      sessionId = JSON.parse(
+        localStorage.getItem("salesExecutiveSession") || "{}"
+      ).id || "";
+    } catch (sessionError) {
+      console.error("DELETE VENDOR SESSION ERROR:", sessionError);
+    }
+
+    if (!sessionId) {
+      showError("Vendor deletion failed", "Your session has expired. Please log in again.");
+      return;
+    }
+
     const { error } = await supabase
       .from("vendors")
       .delete()
-      .eq("id", vendor.id);
+      .eq("id", vendor.id)
+      .eq("sales_id", sessionId);
 
     if (error) {
       console.error(

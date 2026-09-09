@@ -399,7 +399,13 @@ export default function Vendors() {
       <div className="flex items-center justify-between px-5 pt-5">
         <button
           type="button"
-          onClick={() => router.push("/")}
+          onClick={() =>
+            router.push(
+              router.pathname.startsWith("/admin/")
+                ? "/admin/dashboard"
+                : "/",
+            )
+          }
           className="
             w-7
             h-7

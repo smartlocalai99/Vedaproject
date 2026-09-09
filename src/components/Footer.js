@@ -34,7 +34,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-white  z-50">
+    <footer className="safe-area-footer fixed bottom-0 left-0 right-0 bg-white z-50">
       <div className="grid grid-cols-4 h-16">
         {menus.map((menu) => {
           const Icon = menu.icon;

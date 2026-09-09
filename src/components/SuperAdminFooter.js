@@ -34,7 +34,7 @@ export default function SuperAdminFooter() {
   ];
 
   return (
-    <div className="superadmin-bottom-navigation fixed bottom-0 left-0 right-0 bg-white  z-50">
+    <div className="superadmin-bottom-navigation safe-area-footer fixed bottom-0 left-0 right-0 bg-white z-50">
       <div className="grid grid-cols-4 h-16">
         {menus.map((item) => {
           const Icon = item.icon;

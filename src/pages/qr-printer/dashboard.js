@@ -631,7 +631,7 @@ export default function QrPrinterDashboard() {
 
       {selectedMember && (
         <div
-          className="fixed inset-0 z-30 flex items-end overflow-y-auto bg-black/50 p-0 sm:items-center sm:justify-center sm:p-6"
+          className="safe-area-bottom fixed inset-0 z-30 flex items-end overflow-y-auto bg-black/50 p-0 sm:items-center sm:justify-center sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-label="QR code preview"

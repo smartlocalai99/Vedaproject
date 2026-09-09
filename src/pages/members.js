@@ -435,7 +435,13 @@ export default function Members() {
 
         <button
           type="button"
-          onClick={() => router.push("/")}
+          onClick={() =>
+            router.push(
+              router.pathname.startsWith("/admin/")
+                ? "/admin/dashboard"
+                : "/",
+            )
+          }
           className="
             w-7
             h-7

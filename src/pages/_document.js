@@ -11,7 +11,6 @@ export default class VedaDocument extends Document {
     const isQrPrinter = this.props.pathname?.startsWith("/qr-printer");
     return <Html lang="en">
       <Head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         {isSuperAdmin && <>
           <link rel="manifest" href="/manifest.json" />
           <meta name="theme-color" content="#171d2b" />
