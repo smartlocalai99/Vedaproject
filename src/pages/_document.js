@@ -9,6 +9,7 @@ export default class VedaDocument extends Document {
   render() {
     const isSuperAdmin = this.props.pathname === "/" || this.props.pathname?.startsWith("/superadmin");
     const isQrPrinter = this.props.pathname?.startsWith("/qr-printer");
+    const isAdmin = this.props.pathname?.startsWith("/admin");
     return <Html lang="en">
       <Head>
         {isSuperAdmin && <>
@@ -27,6 +28,14 @@ export default class VedaDocument extends Document {
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="VEDA QR Printer" />
           <link rel="apple-touch-icon" href="/Logo%20veda.png" />
+        </>}
+        {isAdmin && <>
+          <link rel="manifest" href="/admin-manifest.json" />
+          <meta name="theme-color" content="#172033" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+          <meta name="apple-mobile-web-app-title" content="VEDA Admin" />
+          <link rel="apple-touch-icon" href="/icons/veda-192.png" />
         </>}
       </Head>
       <body className={`antialiased${isSuperAdmin ? " superadmin-safe-area" : ""}`}><Main /><NextScript /></body>

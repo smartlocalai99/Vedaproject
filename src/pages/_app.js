@@ -7,6 +7,7 @@ export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isSales = router.pathname.startsWith("/salesexecutive");
   const isQrPrinter = router.pathname.startsWith("/qr-printer");
+  const isAdmin = router.pathname.startsWith("/admin");
   const isSuperAdmin = router.pathname.startsWith("/superadmin") || router.pathname === "/";
 
   useEffect(() => {
@@ -15,8 +16,14 @@ export default function App({ Component, pageProps }) {
     }
   }, []);
 
-  const manifest = isQrPrinter ? "/qr-printer-manifest.json" : isSales ? "/sales-manifest.json" : null;
-  const themeColor = isQrPrinter ? "#172033" : isSales ? "#13273C" : "#111827";
+  const manifest = isQrPrinter
+    ? "/qr-printer-manifest.json"
+    : isAdmin
+      ? "/admin-manifest.json"
+      : isSales
+        ? "/sales-manifest.json"
+        : null;
+  const themeColor = isQrPrinter || isAdmin ? "#172033" : isSales ? "#13273C" : "#111827";
   const icon = isQrPrinter ? "/Logo%20veda.png" : "/icons/veda-192.png";
 
   return <><Head><meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />{manifest && <><link rel="manifest" href={manifest} /><meta name="theme-color" content={themeColor} /><link rel="icon" href={icon} /></>}</Head><Component {...pageProps} /></>;
