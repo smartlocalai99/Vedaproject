@@ -30,7 +30,7 @@ export default class VedaDocument extends Document {
           <link rel="apple-touch-icon" href="/Logo%20veda.png" />
         </>}
       </Head>
-      <body className="antialiased"><Main /><NextScript /></body>
+      <body className={`antialiased${isSuperAdmin ? " superadmin-safe-area" : ""}`}><Main /><NextScript /></body>
     </Html>;
   }
 }

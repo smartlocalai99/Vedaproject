@@ -11,6 +11,14 @@ body {
   overscroll-behavior-x: none;
 }
 
+.superadmin-safe-area {
+  padding-top: env(safe-area-inset-top);
+}
+
+.superadmin-safe-area .superadmin-bottom-navigation {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 button,
 a,
 input,
