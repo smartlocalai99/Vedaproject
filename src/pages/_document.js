@@ -16,6 +16,7 @@ export default class VedaDocument extends Document {
           <link rel="manifest" href="/manifest.json" />
           <meta name="theme-color" content="#171d2b" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="Veda Admin" />
           <link rel="apple-touch-icon" href="/icons/icon-192.png" />
@@ -25,6 +26,7 @@ export default class VedaDocument extends Document {
           <meta name="theme-color" content="#172033" />
           <meta name="description" content="VEDA Minds QR Printer Partner application for managing QR printer members and QR codes." />
           <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="VEDA QR Printer" />
           <link rel="apple-touch-icon" href="/Logo%20veda.png" />
@@ -33,6 +35,7 @@ export default class VedaDocument extends Document {
           <link rel="manifest" href="/admin-manifest.json" />
           <meta name="theme-color" content="#172033" />
           <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="mobile-web-app-capable" content="yes" />
           <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
           <meta name="apple-mobile-web-app-title" content="VEDA Admin" />
           <link rel="apple-touch-icon" href="/icons/veda-192.png" />
